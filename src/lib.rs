@@ -4,5 +4,6 @@
 //! functional programming with ADTs, pattern matching, and type inference,
 //! and shell integration via bytecode VM with shell FFI.
 
+pub mod ir;
 pub mod syntax;
 pub mod types;

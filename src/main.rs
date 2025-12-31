@@ -1,7 +1,9 @@
 //! Neap CLI entry point
 
+use neap::ir::{Lower, Optimizer};
 use neap::syntax::{Lexer, Parser};
 use neap::types::TypeChecker;
+use neap::vm::VM;
 use std::env;
 use std::fs;
 use std::process;
@@ -42,8 +44,15 @@ fn main() {
             }
             check_file(&args[2]);
         }
-        "run" | "repl" => {
-            eprintln!("Command '{}' not yet implemented", args[1]);
+        "run" => {
+            if args.len() < 3 {
+                eprintln!("Usage: neap run <file>");
+                process::exit(1);
+            }
+            run_file(&args[2]);
+        }
+        "repl" => {
+            eprintln!("Command 'repl' not yet implemented");
             process::exit(1);
         }
         cmd => {
@@ -140,5 +149,66 @@ fn check_file(path: &str) {
             }
             process::exit(1);
         }
+    }
+}
+
+fn run_file(path: &str) {
+    let source = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error reading file '{path}': {e}");
+            process::exit(1);
+        }
+    };
+
+    // Parse
+    let mut parser = match Parser::new(&source) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Lexer error: {e}");
+            process::exit(1);
+        }
+    };
+
+    let program = match parser.parse_program() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Parse error: {e}");
+            process::exit(1);
+        }
+    };
+
+    // Type check
+    let mut checker = TypeChecker::new();
+    if let Err(errors) = checker.check_program(&program) {
+        eprintln!("Type errors:");
+        for e in &errors {
+            eprintln!("  {e}");
+        }
+        process::exit(1);
+    }
+
+    // Lower to IR
+    let mut lowerer = Lower::new();
+    let ir_program = match lowerer.lower_program(&program) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Lowering error: {e}");
+            process::exit(1);
+        }
+    };
+
+    // Optimize
+    let optimizer = Optimizer::new();
+    let optimized = optimizer.optimize(ir_program);
+
+    // Run
+    let stdout = std::io::stdout();
+    let stdin = std::io::stdin();
+    let mut vm = VM::new(stdout.lock(), stdin.lock());
+
+    if let Err(e) = vm.eval_program(&optimized) {
+        eprintln!("Runtime error: {e}");
+        process::exit(1);
     }
 }

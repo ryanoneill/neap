@@ -7,3 +7,4 @@
 pub mod ir;
 pub mod syntax;
 pub mod types;
+pub mod vm;

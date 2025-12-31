@@ -342,12 +342,34 @@ pub enum Primitive {
     Cons,
     Append,
 
+    // String operations
+    StringLength,
+    Substring,
+    CharAt,
+
+    // Conversions
+    IntToFloat,
+    FloatToInt,
+    IntToString,
+    FloatToString,
+    CharToString,
+    CharToInt,
+    IntToChar,
+
+    // List operations
+    ListLength,
+
     // IO
     Print,
+    PrintNoNewline,
     ReadLine,
     ReadFile,
     WriteFile,
     GetEnv,
+
+    // Assertions
+    Assert,
+    Panic,
 }
 
 impl Primitive {
@@ -398,11 +420,25 @@ impl Primitive {
             Self::Concat => "__concat",
             Self::Cons => "__cons",
             Self::Append => "__append",
+            Self::StringLength => "__string_length",
+            Self::Substring => "__substring",
+            Self::CharAt => "__char_at",
+            Self::IntToFloat => "__int_to_float",
+            Self::FloatToInt => "__float_to_int",
+            Self::IntToString => "__int_to_string",
+            Self::FloatToString => "__float_to_string",
+            Self::CharToString => "__char_to_string",
+            Self::CharToInt => "__char_to_int",
+            Self::IntToChar => "__int_to_char",
+            Self::ListLength => "__list_length",
             Self::Print => "print",
+            Self::PrintNoNewline => "__print_no_newline",
             Self::ReadLine => "readLine",
             Self::ReadFile => "readFile",
             Self::WriteFile => "writeFile",
             Self::GetEnv => "getEnv",
+            Self::Assert => "__assert",
+            Self::Panic => "panic",
         }
     }
 
@@ -410,9 +446,33 @@ impl Primitive {
     #[must_use]
     pub const fn arity(&self) -> usize {
         match self {
-            Self::NegInt | Self::NegFloat | Self::Not | Self::Print | Self::ReadLine => 1,
-            Self::GetEnv | Self::ReadFile => 1,
-            Self::WriteFile => 2,
+            // Unary
+            Self::NegInt
+            | Self::NegFloat
+            | Self::Not
+            | Self::StringLength
+            | Self::IntToFloat
+            | Self::FloatToInt
+            | Self::IntToString
+            | Self::FloatToString
+            | Self::CharToString
+            | Self::CharToInt
+            | Self::IntToChar
+            | Self::ListLength
+            | Self::Print
+            | Self::PrintNoNewline
+            | Self::ReadLine
+            | Self::GetEnv
+            | Self::ReadFile
+            | Self::Panic => 1,
+
+            // Ternary
+            Self::Substring => 3,
+
+            // Binary (assert, write, and comparisons)
+            Self::Assert | Self::WriteFile | Self::CharAt => 2,
+
+            // All others are binary
             _ => 2,
         }
     }

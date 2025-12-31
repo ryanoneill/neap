@@ -5,3 +5,4 @@
 //! and shell integration via bytecode VM with shell FFI.
 
 pub mod syntax;
+pub mod types;

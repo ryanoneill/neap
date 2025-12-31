@@ -1,6 +1,7 @@
 //! Neap CLI entry point
 
 use neap::syntax::{Lexer, Parser};
+use neap::types::TypeChecker;
 use std::env;
 use std::fs;
 use std::process;
@@ -34,7 +35,14 @@ fn main() {
             }
             parse_file(&args[2]);
         }
-        "run" | "check" | "repl" => {
+        "check" => {
+            if args.len() < 3 {
+                eprintln!("Usage: neap check <file>");
+                process::exit(1);
+            }
+            check_file(&args[2]);
+        }
+        "run" | "repl" => {
             eprintln!("Command '{}' not yet implemented", args[1]);
             process::exit(1);
         }
@@ -90,6 +98,46 @@ fn parse_file(path: &str) {
         }
         Err(e) => {
             eprintln!("Parse error: {e}");
+            process::exit(1);
+        }
+    }
+}
+
+fn check_file(path: &str) {
+    let source = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error reading file '{path}': {e}");
+            process::exit(1);
+        }
+    };
+
+    let mut parser = match Parser::new(&source) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Lexer error: {e}");
+            process::exit(1);
+        }
+    };
+
+    let program = match parser.parse_program() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Parse error: {e}");
+            process::exit(1);
+        }
+    };
+
+    let mut checker = TypeChecker::new();
+    match checker.check_program(&program) {
+        Ok(()) => {
+            println!("Type check successful!");
+        }
+        Err(errors) => {
+            eprintln!("Type errors:");
+            for e in &errors {
+                eprintln!("  {e}");
+            }
             process::exit(1);
         }
     }

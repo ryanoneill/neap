@@ -427,6 +427,13 @@ impl Lower {
             });
         }
 
+        // Check if this is a built-in function call
+        if let Expr::Var(name) = &func.value {
+            if let Some(builtin) = self.lookup_builtin(name) {
+                return self.lower_builtin_call(builtin, arg, result_ty);
+            }
+        }
+
         // Infer types
         let arg_ty = self.expr_type(arg)?;
         let func_ty = Type::arrow(arg_ty.clone(), result_ty.clone());
@@ -443,6 +450,101 @@ impl Lower {
             func: Box::new(ir_func),
             arg: Box::new(ir_arg),
             result_ty: result_ty.clone(),
+        })
+    }
+
+    /// Look up a built-in function by name.
+    fn lookup_builtin(&self, name: &str) -> Option<Primitive> {
+        match name {
+            // Conversion functions
+            "intToFloat" => Some(Primitive::IntToFloat),
+            "floatToInt" => Some(Primitive::FloatToInt),
+            "intToString" => Some(Primitive::IntToString),
+            "floatToString" => Some(Primitive::FloatToString),
+            "charToString" => Some(Primitive::CharToString),
+            "charToInt" => Some(Primitive::CharToInt),
+            "intToChar" => Some(Primitive::IntToChar),
+
+            // String operations
+            "stringLength" => Some(Primitive::StringLength),
+            "charAt" => Some(Primitive::CharAt),
+            "substring" => Some(Primitive::Substring),
+
+            // List operations
+            "listLength" => Some(Primitive::ListLength),
+
+            // IO operations
+            "print" => Some(Primitive::Print),
+            "printNoNewline" => Some(Primitive::PrintNoNewline),
+            "readLine" => Some(Primitive::ReadLine),
+            "readFile" => Some(Primitive::ReadFile),
+            "writeFile" => Some(Primitive::WriteFile),
+            "getEnv" => Some(Primitive::GetEnv),
+
+            // Assertions
+            "assert" => Some(Primitive::Assert),
+            "panic" => Some(Primitive::Panic),
+
+            _ => None,
+        }
+    }
+
+    /// Lower a built-in function call to IR.
+    fn lower_builtin_call(
+        &mut self,
+        builtin: Primitive,
+        arg: &Spanned<Expr>,
+        result_ty: &Type,
+    ) -> Result<IRExpr, LowerError> {
+        // Handle multi-argument builtins (passed as tuples)
+        match builtin {
+            // Two-argument functions
+            Primitive::CharAt | Primitive::WriteFile => {
+                // These take a tuple argument
+                if let Expr::Tuple(elems) = &arg.value {
+                    if elems.len() == 2 {
+                        let ty0 = self.expr_type(&elems[0])?;
+                        let ty1 = self.expr_type(&elems[1])?;
+                        let arg0 = self.lower_expr(&elems[0], &ty0)?;
+                        let arg1 = self.lower_expr(&elems[1], &ty1)?;
+                        return Ok(IRExpr::Prim {
+                            op: builtin,
+                            args: vec![arg0, arg1],
+                            ty: result_ty.clone(),
+                        });
+                    }
+                }
+                // Fall through to single arg handling for partial application
+            }
+            // Three-argument functions
+            Primitive::Substring => {
+                if let Expr::Tuple(elems) = &arg.value {
+                    if elems.len() == 3 {
+                        let ty0 = self.expr_type(&elems[0])?;
+                        let ty1 = self.expr_type(&elems[1])?;
+                        let ty2 = self.expr_type(&elems[2])?;
+                        let arg0 = self.lower_expr(&elems[0], &ty0)?;
+                        let arg1 = self.lower_expr(&elems[1], &ty1)?;
+                        let arg2 = self.lower_expr(&elems[2], &ty2)?;
+                        return Ok(IRExpr::Prim {
+                            op: builtin,
+                            args: vec![arg0, arg1, arg2],
+                            ty: result_ty.clone(),
+                        });
+                    }
+                }
+                // Fall through to single arg handling
+            }
+            _ => {}
+        }
+
+        // Single-argument builtins
+        let arg_ty = self.expr_type(arg)?;
+        let ir_arg = self.lower_expr(arg, &arg_ty)?;
+        Ok(IRExpr::Prim {
+            op: builtin,
+            args: vec![ir_arg],
+            ty: result_ty.clone(),
         })
     }
 

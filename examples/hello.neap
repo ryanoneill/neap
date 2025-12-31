@@ -1,0 +1,14 @@
+let x = 42
+let s = intToString x
+let r1 = print s
+
+let y = 3.14
+let fs = floatToString y
+let r2 = print fs
+
+let combined = s ^ " and " ^ fs
+let r3 = print combined
+
+let z = floatToInt y
+let zs = intToString z
+let r4 = print zs

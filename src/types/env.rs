@@ -232,6 +232,90 @@ impl TypeEnv {
             "getEnv".to_string(),
             TypeScheme::mono(Type::arrow(Type::string(), Type::io(Type::option(Type::string())))),
         );
+
+        // Conversion functions
+        self.bindings.insert(
+            "intToFloat".to_string(),
+            TypeScheme::mono(Type::arrow(Type::int(), Type::float())),
+        );
+
+        self.bindings.insert(
+            "floatToInt".to_string(),
+            TypeScheme::mono(Type::arrow(Type::float(), Type::int())),
+        );
+
+        self.bindings.insert(
+            "intToString".to_string(),
+            TypeScheme::mono(Type::arrow(Type::int(), Type::string())),
+        );
+
+        self.bindings.insert(
+            "floatToString".to_string(),
+            TypeScheme::mono(Type::arrow(Type::float(), Type::string())),
+        );
+
+        self.bindings.insert(
+            "charToString".to_string(),
+            TypeScheme::mono(Type::arrow(Type::char(), Type::string())),
+        );
+
+        self.bindings.insert(
+            "charToInt".to_string(),
+            TypeScheme::mono(Type::arrow(Type::char(), Type::int())),
+        );
+
+        self.bindings.insert(
+            "intToChar".to_string(),
+            TypeScheme::mono(Type::arrow(Type::int(), Type::char())),
+        );
+
+        // String operations
+        self.bindings.insert(
+            "stringLength".to_string(),
+            TypeScheme::mono(Type::arrow(Type::string(), Type::int())),
+        );
+
+        self.bindings.insert(
+            "charAt".to_string(),
+            TypeScheme::mono(Type::arrow(
+                Type::Tuple(vec![Type::string(), Type::int()]),
+                Type::char(),
+            )),
+        );
+
+        self.bindings.insert(
+            "substring".to_string(),
+            TypeScheme::mono(Type::arrow(
+                Type::Tuple(vec![Type::string(), Type::int(), Type::int()]),
+                Type::string(),
+            )),
+        );
+
+        // List operations
+        let a = TypeVar::fresh();
+        self.bindings.insert(
+            "listLength".to_string(),
+            TypeScheme::poly(vec![a], Type::arrow(Type::list(Type::Var(a)), Type::int())),
+        );
+
+        // Print without newline
+        let a = TypeVar::fresh();
+        self.bindings.insert(
+            "printNoNewline".to_string(),
+            TypeScheme::poly(vec![a], Type::arrow(Type::Var(a), Type::io(Type::unit()))),
+        );
+
+        // Assertions
+        self.bindings.insert(
+            "assert".to_string(),
+            TypeScheme::mono(Type::arrow(Type::bool(), Type::io(Type::unit()))),
+        );
+
+        let a = TypeVar::fresh();
+        self.bindings.insert(
+            "panic".to_string(),
+            TypeScheme::poly(vec![a], Type::arrow(Type::string(), Type::Var(a))),
+        );
     }
 
     // ========== Variable Bindings ==========

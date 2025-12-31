@@ -1,0 +1,32 @@
+[package]
+name = "neap"
+version = "0.1.0"
+edition = "2024"
+description = "A statically-typed, ML-inspired language for shell scripting"
+license = "MIT"
+repository = "https://github.com/ryanoneill/neap"
+
+[dependencies]
+# Error handling
+thiserror = "2.0"
+
+# Error reporting with nice diagnostics
+ariadne = "0.4"
+
+[dev-dependencies]
+# Property-based testing
+proptest = "1.5"
+
+# Better test assertions
+pretty_assertions = "1.4"
+
+# Temp files for shell integration tests
+tempfile = "3.14"
+
+[[bin]]
+name = "neap"
+path = "src/main.rs"
+
+[lib]
+name = "neap"
+path = "src/lib.rs"

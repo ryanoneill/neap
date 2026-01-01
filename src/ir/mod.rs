@@ -9,7 +9,7 @@ mod lower;
 mod optimize;
 
 pub use core::{
-    Binding, IRDecl, IRExpr, IRLiteral, IRPattern, IRProgram, Primitive, VarId,
+    Binding, IRCommandPart, IRDecl, IRExpr, IRLiteral, IRPattern, IRProgram, Primitive, VarId,
 };
 pub use lower::{Lower, LowerError};
 pub use optimize::Optimizer;

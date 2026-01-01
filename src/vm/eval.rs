@@ -67,6 +67,11 @@ impl<W: Write, R: BufRead> VM<W, R> {
         &mut self.stdin
     }
 
+    /// Consume the VM and return the stdout writer.
+    pub fn into_writer(self) -> W {
+        self.stdout
+    }
+
     /// Evaluate a program.
     pub fn eval_program(&mut self, program: &IRProgram) -> Result<(), RuntimeError> {
         for decl in &program.decls {
@@ -324,7 +329,102 @@ impl<W: Write, R: BufRead> VM<W, R> {
                     }),
                 }
             }
+
+            IRExpr::Command { parts, stdin, .. } => {
+                self.eval_command(parts, stdin.as_deref(), env)
+            }
         }
+    }
+
+    /// Evaluate a shell command.
+    fn eval_command(
+        &mut self,
+        parts: &[crate::ir::IRCommandPart],
+        stdin: Option<&IRExpr>,
+        env: &Rc<Env>,
+    ) -> Result<Value, RuntimeError> {
+        use std::collections::HashMap;
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        // Build the command string from parts
+        let mut cmd_str = String::new();
+        for part in parts {
+            match part {
+                crate::ir::IRCommandPart::Literal(s) => cmd_str.push_str(s),
+                crate::ir::IRCommandPart::Interpolation(expr) => {
+                    let val = self.eval_expr(expr, env)?;
+                    cmd_str.push_str(&format!("{val}"));
+                }
+            }
+        }
+
+        // Evaluate stdin if provided
+        let stdin_content = if let Some(stdin_expr) = stdin {
+            let stdin_val = self.eval_expr(stdin_expr, env)?;
+            // If stdin is a command result, use its stdout
+            if let Value::Record(fields) = &stdin_val {
+                fields.get("stdout").map(|v| format!("{v}"))
+            } else {
+                Some(format!("{stdin_val}"))
+            }
+        } else {
+            None
+        };
+
+        // Parse command string - simple whitespace split for now
+        // TODO: proper shell parsing with quotes, etc.
+        let mut parts_iter = cmd_str.split_whitespace();
+        let program = parts_iter.next().ok_or_else(|| RuntimeError::CommandError {
+            message: "empty command".to_string(),
+        })?;
+        let args: Vec<&str> = parts_iter.collect();
+
+        // Execute the command
+        let mut cmd = Command::new(program);
+        cmd.args(&args);
+
+        if stdin_content.is_some() {
+            cmd.stdin(Stdio::piped());
+        }
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| RuntimeError::CommandError {
+            message: format!("failed to spawn command '{}': {}", program, e),
+        })?;
+
+        // Write stdin if provided
+        if let Some(input) = &stdin_content {
+            if let Some(mut stdin_handle) = child.stdin.take() {
+                stdin_handle.write_all(input.as_bytes()).map_err(|e| {
+                    RuntimeError::CommandError {
+                        message: format!("failed to write to stdin: {}", e),
+                    }
+                })?;
+            }
+        }
+
+        let output = child.wait_with_output().map_err(|e| RuntimeError::CommandError {
+            message: format!("failed to wait for command: {}", e),
+        })?;
+
+        // Build the result record
+        let mut fields = HashMap::new();
+        fields.insert(
+            "exitCode".to_string(),
+            Value::Int(output.status.code().unwrap_or(-1) as i64),
+        );
+        fields.insert(
+            "stdout".to_string(),
+            Value::string(String::from_utf8_lossy(&output.stdout).into_owned()),
+        );
+        fields.insert(
+            "stderr".to_string(),
+            Value::string(String::from_utf8_lossy(&output.stderr).into_owned()),
+        );
+
+        Ok(Value::record(fields))
     }
 
     /// Evaluate letrec bindings, handling mutual recursion.
@@ -412,7 +512,7 @@ impl Default for VM<std::io::Stdout, std::io::StdinLock<'static>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::Primitive;
+    use crate::ir::{IRCommandPart, Primitive};
     use crate::types::Type;
     use std::io::Cursor;
 
@@ -869,5 +969,87 @@ mod tests {
 
         let result = vm.eval_expr(&expr, &env);
         assert!(matches!(result, Err(RuntimeError::StackOverflow)));
+    }
+
+    // ========== Command Execution Tests ==========
+
+    #[test]
+    fn eval_command_echo() {
+        let mut vm = test_vm();
+        let env = Rc::new(Env::new());
+
+        // Simple echo command
+        let expr = IRExpr::Command {
+            parts: vec![IRCommandPart::Literal("echo hello".to_string())],
+            stdin: None,
+            ty: Type::command_result(),
+        };
+
+        let result = vm.eval_expr(&expr, &env).unwrap();
+
+        // Result should be a record with exitCode, stdout, stderr
+        if let Value::Record(fields) = result {
+            assert!(fields.contains_key("exitCode"));
+            assert!(fields.contains_key("stdout"));
+            assert!(fields.contains_key("stderr"));
+
+            // Check exit code is 0
+            assert_eq!(fields.get("exitCode"), Some(&Value::Int(0)));
+
+            // Check stdout contains "hello"
+            if let Some(Value::String(stdout)) = fields.get("stdout") {
+                assert!(stdout.contains("hello"), "stdout was: {}", stdout);
+            } else {
+                panic!("stdout should be a string");
+            }
+        } else {
+            panic!("Expected Record, got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn eval_command_with_interpolation() {
+        let mut vm = test_vm();
+        let env = Rc::new(Env::new());
+
+        // Command with interpolation: echo {value}
+        let expr = IRExpr::Command {
+            parts: vec![
+                IRCommandPart::Literal("echo ".to_string()),
+                IRCommandPart::Interpolation(Box::new(IRExpr::Lit(
+                    IRLiteral::String("world".to_string()),
+                    Type::string(),
+                ))),
+            ],
+            stdin: None,
+            ty: Type::command_result(),
+        };
+
+        let result = vm.eval_expr(&expr, &env).unwrap();
+
+        if let Value::Record(fields) = result {
+            assert_eq!(fields.get("exitCode"), Some(&Value::Int(0)));
+            if let Some(Value::String(stdout)) = fields.get("stdout") {
+                assert!(stdout.contains("world"), "stdout was: {}", stdout);
+            }
+        } else {
+            panic!("Expected Record");
+        }
+    }
+
+    #[test]
+    fn eval_command_not_found() {
+        let mut vm = test_vm();
+        let env = Rc::new(Env::new());
+
+        // Try to run a command that doesn't exist
+        let expr = IRExpr::Command {
+            parts: vec![IRCommandPart::Literal("this_command_does_not_exist_12345".to_string())],
+            stdin: None,
+            ty: Type::command_result(),
+        };
+
+        let result = vm.eval_expr(&expr, &env);
+        assert!(result.is_err());
     }
 }

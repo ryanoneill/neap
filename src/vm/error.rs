@@ -39,6 +39,9 @@ pub enum RuntimeError {
 
     /// User-defined error (from Result::Err)
     UserError { message: String },
+
+    /// Command execution error
+    CommandError { message: String },
 }
 
 impl fmt::Display for RuntimeError {
@@ -59,6 +62,7 @@ impl fmt::Display for RuntimeError {
             Self::AssertionFailed { message } => write!(f, "assertion failed: {message}"),
             Self::StackOverflow => write!(f, "stack overflow"),
             Self::UserError { message } => write!(f, "error: {message}"),
+            Self::CommandError { message } => write!(f, "command error: {message}"),
         }
     }
 }

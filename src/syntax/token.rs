@@ -80,6 +80,8 @@ pub enum TokenKind {
     Dollar,
     /// `` ` `` - command interpolation (backtick)
     Backtick,
+    /// Text inside a command (between backticks)
+    CommandText(String),
 
     // ========== Operators ==========
     /// `+` - addition
@@ -327,6 +329,7 @@ impl TokenKind {
             Self::Lt => "<",
             Self::Dollar => "$",
             Self::Backtick => "`",
+            Self::CommandText(_) => "command text",
             Self::Plus => "+",
             Self::Minus => "-",
             Self::Star => "*",

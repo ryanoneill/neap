@@ -10,12 +10,14 @@
 use std::collections::HashMap;
 
 use crate::syntax::{
-    BinOp, Decl, DoStmt, Expr, FunDecl, Literal, MatchArm, Pattern, Program, Spanned, UnOp,
-    ValDecl,
+    BinOp, CommandPart, Decl, DoStmt, Expr, FunDecl, Literal, MatchArm, Pattern, Program, Spanned,
+    UnOp, ValDecl,
 };
 use crate::types::{Type, TypeChecker, TypeError};
 
-use super::core::{Binding, IRDecl, IRExpr, IRLiteral, IRPattern, IRProgram, Primitive, VarId};
+use super::core::{
+    Binding, IRCommandPart, IRDecl, IRExpr, IRLiteral, IRPattern, IRProgram, Primitive, VarId,
+};
 
 /// Errors that can occur during lowering.
 #[derive(Debug, Clone)]
@@ -150,6 +152,28 @@ impl Lower {
                 // For now, just return a placeholder - type annotations
                 // should have been resolved during type checking
                 self.type_expr_to_type(ty_expr)
+            }
+
+            Expr::Command(_) => Ok(Type::command_result()),
+
+            Expr::Field(record, field) => {
+                let record_ty = self.expr_type(record)?;
+                if let Type::Record(fields) = record_ty {
+                    for (f, ty) in fields {
+                        if f == field.value {
+                            return Ok(ty);
+                        }
+                    }
+                    Err(LowerError::Internal(format!(
+                        "field {} not found",
+                        field.value
+                    )))
+                } else {
+                    Err(LowerError::Internal(format!(
+                        "expected record type for field access, got {:?}",
+                        record_ty
+                    )))
+                }
             }
 
             // For complex expressions, we need more context
@@ -391,10 +415,40 @@ impl Lower {
 
             Expr::Do(stmts) => self.lower_do(stmts, ty),
 
+            Expr::Command(parts) => self.lower_command(parts, ty),
+
             Expr::Redirect { .. } => {
                 Err(LowerError::Unsupported("redirect expressions".to_string()))
             }
         }
+    }
+
+    /// Lower a shell command expression.
+    fn lower_command(
+        &mut self,
+        parts: &[CommandPart],
+        ty: &Type,
+    ) -> Result<IRExpr, LowerError> {
+        // Build the command parts into IR
+        let mut ir_parts = Vec::new();
+        for part in parts {
+            match part {
+                CommandPart::Literal(s) => {
+                    ir_parts.push(IRCommandPart::Literal(s.clone()));
+                }
+                CommandPart::Interpolation(expr) => {
+                    let expr_ty = self.expr_type(expr)?;
+                    let ir_expr = self.lower_expr(expr, &expr_ty)?;
+                    ir_parts.push(IRCommandPart::Interpolation(Box::new(ir_expr)));
+                }
+            }
+        }
+
+        Ok(IRExpr::Command {
+            parts: ir_parts,
+            stdin: None,
+            ty: ty.clone(),
+        })
     }
 
     /// Lower a literal.

@@ -278,6 +278,24 @@ impl Optimizer {
             IRExpr::Lit(_, _) | IRExpr::Var(_, _) | IRExpr::Global(_, _) | IRExpr::Unit => {
                 (expr, false)
             }
+
+            // Commands are passed through (we could optimize interpolations in the future)
+            IRExpr::Command { parts, stdin, ty } => {
+                let (opt_stdin, stdin_changed) = if let Some(s) = stdin {
+                    let (opt_s, changed) = self.optimize_expr(*s);
+                    (Some(Box::new(opt_s)), changed)
+                } else {
+                    (None, false)
+                };
+                (
+                    IRExpr::Command {
+                        parts,
+                        stdin: opt_stdin,
+                        ty,
+                    },
+                    stdin_changed,
+                )
+            }
         }
     }
 
@@ -604,6 +622,18 @@ fn count_uses(var: VarId, expr: &IRExpr) -> usize {
         }
 
         IRExpr::Field { record, .. } => count_uses(var, record),
+
+        IRExpr::Command { parts, stdin, .. } => {
+            let in_parts: usize = parts
+                .iter()
+                .map(|p| match p {
+                    crate::ir::IRCommandPart::Literal(_) => 0,
+                    crate::ir::IRCommandPart::Interpolation(e) => count_uses(var, e),
+                })
+                .sum();
+            let in_stdin = stdin.as_ref().map_or(0, |s| count_uses(var, s));
+            in_parts + in_stdin
+        }
     }
 }
 
@@ -754,6 +784,28 @@ fn substitute(var: VarId, replacement: &IRExpr, expr: IRExpr) -> IRExpr {
             field,
             ty,
         },
+
+        IRExpr::Command { parts, stdin, ty } => {
+            let new_parts: Vec<_> = parts
+                .into_iter()
+                .map(|p| match p {
+                    crate::ir::IRCommandPart::Literal(s) => crate::ir::IRCommandPart::Literal(s),
+                    crate::ir::IRCommandPart::Interpolation(e) => {
+                        crate::ir::IRCommandPart::Interpolation(Box::new(substitute(
+                            var,
+                            replacement,
+                            *e,
+                        )))
+                    }
+                })
+                .collect();
+            let new_stdin = stdin.map(|s| Box::new(substitute(var, replacement, *s)));
+            IRExpr::Command {
+                parts: new_parts,
+                stdin: new_stdin,
+                ty,
+            }
+        }
     }
 }
 
@@ -849,6 +901,17 @@ fn collect_free_vars(expr: &IRExpr, vars: &mut HashSet<VarId>, bound: &HashSet<V
 
         IRExpr::Field { record, .. } => {
             collect_free_vars(record, vars, bound);
+        }
+
+        IRExpr::Command { parts, stdin, .. } => {
+            for part in parts {
+                if let crate::ir::IRCommandPart::Interpolation(e) = part {
+                    collect_free_vars(e, vars, bound);
+                }
+            }
+            if let Some(s) = stdin {
+                collect_free_vars(s, vars, bound);
+            }
         }
     }
 }

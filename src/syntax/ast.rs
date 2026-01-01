@@ -92,6 +92,15 @@ pub struct Constructor {
     pub arg: Option<Spanned<TypeExpr>>,
 }
 
+/// A part of a shell command (for interpolation support).
+#[derive(Debug, Clone, PartialEq)]
+pub enum CommandPart {
+    /// Literal text in the command
+    Literal(String),
+    /// Interpolated expression: `{expr}`
+    Interpolation(Box<Spanned<Expr>>),
+}
+
 /// An expression.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -161,6 +170,9 @@ pub enum Expr {
 
     /// Environment variable: `$VAR`
     EnvVar(String),
+
+    /// Shell command: `` `ls -la` `` or `` `echo {x}` ``
+    Command(Vec<CommandPart>),
 
     /// Unit value: `()`
     Unit,

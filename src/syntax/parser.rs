@@ -443,6 +443,9 @@ impl Parser {
             // Record
             Some(TokenKind::LBrace) => self.parse_record_expr(),
 
+            // Shell command
+            Some(TokenKind::Backtick) => self.parse_command_expr(),
+
             Some(_) => {
                 let token = self.peek().unwrap();
                 Err(ParseError::InvalidExpression { span: token.span })
@@ -524,6 +527,56 @@ impl Parser {
         self.expect(TokenKind::Eq)?;
         let value = self.parse_expr()?;
         Ok((name, value))
+    }
+
+    /// Parse a shell command expression: `` `command {interpolation} more` ``
+    fn parse_command_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
+        use crate::syntax::ast::CommandPart;
+
+        let start = self.expect(TokenKind::Backtick)?.span;
+        let mut parts = Vec::new();
+
+        loop {
+            match self.peek_kind().cloned() {
+                Some(TokenKind::Backtick) => {
+                    // End of command
+                    let end = self.advance().span;
+                    return Ok(Spanned::new(Expr::Command(parts), start.merge(end)));
+                }
+
+                Some(TokenKind::CommandText(text)) => {
+                    // Literal command text
+                    self.advance();
+                    if !text.is_empty() {
+                        parts.push(CommandPart::Literal(text));
+                    }
+                }
+
+                Some(TokenKind::LBrace) => {
+                    // Start of interpolation
+                    self.advance();
+                    let expr = self.parse_expr()?;
+                    self.expect(TokenKind::RBrace)?;
+                    parts.push(CommandPart::Interpolation(Box::new(expr)));
+                }
+
+                Some(TokenKind::Eof) | None => {
+                    return Err(ParseError::UnexpectedEof {
+                        expected: "closing backtick".to_string(),
+                    });
+                }
+
+                Some(_) => {
+                    // This shouldn't happen if the lexer is working correctly
+                    let token = self.peek().unwrap();
+                    return Err(ParseError::UnexpectedToken {
+                        expected: "command text, interpolation, or closing backtick".to_string(),
+                        found: token.kind.name().to_string(),
+                        span: token.span,
+                    });
+                }
+            }
+        }
     }
 
     fn parse_let_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
@@ -2054,5 +2107,67 @@ mod tests {
             current = &lhs.value;
         }
         assert_eq!(count, 3);
+    }
+
+    // ========== Command Expression Tests ==========
+
+    #[test]
+    fn parse_command_simple() {
+        let expr = parse_expr("`ls -la`").unwrap();
+        if let Expr::Command(parts) = expr {
+            assert_eq!(parts.len(), 1);
+            assert!(matches!(&parts[0], CommandPart::Literal(s) if s == "ls -la"));
+        } else {
+            panic!("Expected Command, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn parse_command_with_interpolation() {
+        let expr = parse_expr("`echo {x}`").unwrap();
+        if let Expr::Command(parts) = expr {
+            assert_eq!(parts.len(), 2);
+            assert!(matches!(&parts[0], CommandPart::Literal(s) if s == "echo "));
+            assert!(matches!(&parts[1], CommandPart::Interpolation(e) if matches!(e.value, Expr::Var(ref n) if n == "x")));
+        } else {
+            panic!("Expected Command, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn parse_command_multiple_interpolations() {
+        let expr = parse_expr("`{cmd} {arg1} {arg2}`").unwrap();
+        if let Expr::Command(parts) = expr {
+            assert_eq!(parts.len(), 5);
+            assert!(matches!(&parts[0], CommandPart::Interpolation(_)));
+            assert!(matches!(&parts[1], CommandPart::Literal(s) if s == " "));
+            assert!(matches!(&parts[2], CommandPart::Interpolation(_)));
+            assert!(matches!(&parts[3], CommandPart::Literal(s) if s == " "));
+            assert!(matches!(&parts[4], CommandPart::Interpolation(_)));
+        } else {
+            panic!("Expected Command, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn parse_command_empty() {
+        let expr = parse_expr("``").unwrap();
+        if let Expr::Command(parts) = expr {
+            assert!(parts.is_empty());
+        } else {
+            panic!("Expected Command, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn parse_command_pipeline() {
+        // Commands piped together
+        let expr = parse_expr("`ls` |> `grep foo`").unwrap();
+        if let Expr::Pipe(lhs, rhs) = expr {
+            assert!(matches!(lhs.value, Expr::Command(_)));
+            assert!(matches!(rhs.value, Expr::Command(_)));
+        } else {
+            panic!("Expected Pipe, got {:?}", expr);
+        }
     }
 }

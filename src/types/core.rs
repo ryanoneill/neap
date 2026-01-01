@@ -135,6 +135,16 @@ impl Type {
         Self::Con("stream".to_string(), vec![elem])
     }
 
+    /// The command result record type: `{exitCode: int, stdout: string, stderr: string}`
+    #[must_use]
+    pub fn command_result() -> Self {
+        Self::Record(vec![
+            ("exitCode".to_string(), Type::int()),
+            ("stdout".to_string(), Type::string()),
+            ("stderr".to_string(), Type::string()),
+        ])
+    }
+
     /// A function type `t1 -> t2`
     #[must_use]
     pub fn arrow(from: Type, to: Type) -> Self {

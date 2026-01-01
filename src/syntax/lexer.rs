@@ -54,6 +54,10 @@ pub struct Lexer<'src> {
     rest: &'src str,
     /// Current byte position in source
     pos: usize,
+    /// Whether we're inside a command (between backticks)
+    in_command: bool,
+    /// Depth of braces for interpolation (0 = not in interpolation)
+    brace_depth: usize,
 }
 
 impl<'src> Lexer<'src> {
@@ -64,6 +68,8 @@ impl<'src> Lexer<'src> {
             source,
             rest: source,
             pos: 0,
+            in_command: false,
+            brace_depth: 0,
         }
     }
 
@@ -86,6 +92,11 @@ impl<'src> Lexer<'src> {
 
     /// Get the next token from the input.
     pub fn next_token(&mut self) -> Result<Token, LexerError> {
+        // In command mode (inside backticks), lex command text
+        if self.in_command && self.brace_depth == 0 {
+            return self.lex_command_content();
+        }
+
         self.skip_whitespace_and_comments()?;
 
         if self.rest.is_empty() {
@@ -470,6 +481,68 @@ impl<'src> Lexer<'src> {
         ))
     }
 
+    /// Lex command content (text inside backticks).
+    ///
+    /// Returns either:
+    /// - `CommandText(String)` for literal text
+    /// - `LBrace` when hitting `{` for interpolation
+    /// - `Backtick` when hitting the closing backtick
+    fn lex_command_content(&mut self) -> Result<Token, LexerError> {
+        let start = self.pos;
+
+        // Check for special characters first
+        match self.peek_char() {
+            None => {
+                // Unterminated command - return EOF and let parser handle error
+                return Ok(Token::new(TokenKind::Eof, Span::empty(self.pos)));
+            }
+            Some('`') => {
+                // Closing backtick - exit command mode
+                self.advance();
+                self.in_command = false;
+                return Ok(Token::new(TokenKind::Backtick, Span::new(start, self.pos)));
+            }
+            Some('{') => {
+                // Start of interpolation
+                self.advance();
+                self.brace_depth = 1;
+                return Ok(Token::new(TokenKind::LBrace, Span::new(start, self.pos)));
+            }
+            _ => {}
+        }
+
+        // Collect command text until we hit `, {, or end of input
+        let mut text = String::new();
+        while let Some(ch) = self.peek_char() {
+            match ch {
+                '`' | '{' => break,
+                '\\' => {
+                    // Escape sequence in command
+                    self.advance();
+                    if let Some(next) = self.peek_char() {
+                        // Allow escaping ` and { in commands
+                        if next == '`' || next == '{' || next == '\\' {
+                            text.push(next);
+                            self.advance();
+                        } else {
+                            // Other escapes: keep the backslash
+                            text.push('\\');
+                        }
+                    }
+                }
+                _ => {
+                    text.push(ch);
+                    self.advance();
+                }
+            }
+        }
+
+        Ok(Token::new(
+            TokenKind::CommandText(text),
+            Span::new(start, self.pos),
+        ))
+    }
+
     /// Lex a character literal (#"a").
     fn lex_char(&mut self) -> Result<Token, LexerError> {
         let start = self.pos;
@@ -575,13 +648,36 @@ impl<'src> Lexer<'src> {
 
         // Single-character operators and punctuation
         let ch = self.peek_char().unwrap();
+
+        // Handle backtick specially - toggles command mode
+        if ch == '`' {
+            self.advance();
+            self.in_command = true;
+            return Ok(Token::new(TokenKind::Backtick, Span::new(start, self.pos)));
+        }
+
+        // Handle braces with depth tracking for command interpolation
+        if ch == '{' {
+            self.advance();
+            if self.in_command {
+                self.brace_depth += 1;
+            }
+            return Ok(Token::new(TokenKind::LBrace, Span::new(start, self.pos)));
+        }
+
+        if ch == '}' {
+            self.advance();
+            if self.in_command && self.brace_depth > 0 {
+                self.brace_depth -= 1;
+            }
+            return Ok(Token::new(TokenKind::RBrace, Span::new(start, self.pos)));
+        }
+
         let kind = match ch {
             '(' => TokenKind::LParen,
             ')' => TokenKind::RParen,
             '[' => TokenKind::LBracket,
             ']' => TokenKind::RBracket,
-            '{' => TokenKind::LBrace,
-            '}' => TokenKind::RBrace,
             ',' => TokenKind::Comma,
             ';' => TokenKind::Semi,
             ':' => TokenKind::Colon,
@@ -599,7 +695,6 @@ impl<'src> Lexer<'src> {
             '@' => TokenKind::At,
             '!' => TokenKind::Bang,
             '$' => TokenKind::Dollar,
-            '`' => TokenKind::Backtick,
             _ => return Err(LexerError::UnexpectedChar { ch, pos: start }),
         };
 

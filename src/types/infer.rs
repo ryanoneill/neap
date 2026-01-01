@@ -262,6 +262,17 @@ impl TypeChecker {
 
             Expr::EnvVar(_) => Ok(Type::option(Type::string())),
 
+            Expr::Command(parts) => {
+                // Infer types of interpolated expressions
+                for part in parts {
+                    if let crate::syntax::CommandPart::Interpolation(expr) = part {
+                        self.infer(expr)?;
+                    }
+                }
+                // Commands return a record: {exitCode: int, stdout: string, stderr: string}
+                Ok(Type::command_result())
+            }
+
             Expr::Do(stmts) => self.infer_do(stmts),
 
             Expr::Redirect { expr, .. } => {
@@ -1265,6 +1276,27 @@ mod tests {
             val x = 1
             val y = x + 1
             fun double n = n * 2
+        "#,
+        );
+        assert!(result.is_ok());
+    }
+
+    // ========== Command Tests ==========
+
+    #[test]
+    fn infer_command() {
+        let ty = infer("`ls -la`").unwrap();
+        // Command returns CommandResult record
+        assert!(matches!(ty, Type::Record(fields) if fields.len() == 3));
+    }
+
+    #[test]
+    fn infer_command_with_interpolation() {
+        // Interpolation with string value
+        let result = check(
+            r#"
+            val file = "README.md"
+            val result = `cat {file}`
         "#,
         );
         assert!(result.is_ok());

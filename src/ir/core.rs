@@ -188,6 +188,25 @@ pub enum IRExpr {
 
     /// Unit value
     Unit,
+
+    /// Shell command execution
+    Command {
+        /// The command parts (text and interpolations)
+        parts: Vec<IRCommandPart>,
+        /// Optional stdin (from a piped command)
+        stdin: Option<Box<IRExpr>>,
+        /// Result type (CommandResult record)
+        ty: Type,
+    },
+}
+
+/// A part of a shell command.
+#[derive(Debug, Clone)]
+pub enum IRCommandPart {
+    /// Literal text in the command
+    Literal(String),
+    /// An interpolated expression
+    Interpolation(Box<IRExpr>),
 }
 
 impl IRExpr {
@@ -210,7 +229,8 @@ impl IRExpr {
             | Self::Tuple { ty: result_ty, .. }
             | Self::TupleProj { ty: result_ty, .. }
             | Self::Record { ty: result_ty, .. }
-            | Self::Field { ty: result_ty, .. } => result_ty.clone(),
+            | Self::Field { ty: result_ty, .. }
+            | Self::Command { ty: result_ty, .. } => result_ty.clone(),
             Self::Unit => Type::unit(),
         }
     }

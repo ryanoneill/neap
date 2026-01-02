@@ -324,6 +324,247 @@ impl TypeEnv {
             "panic".to_string(),
             TypeScheme::poly(vec![a], Type::arrow(Type::string(), Type::Var(a))),
         );
+
+        // ========== Built-in Type Classes ==========
+        self.add_builtin_classes();
+    }
+
+    /// Add built-in type classes and instances.
+    fn add_builtin_classes(&mut self) {
+        // ========== Show class ==========
+        // show: 'a -> string
+        let a = TypeVar::fresh();
+        let show_class = TypeClass::with_methods(
+            "Show",
+            vec![(
+                "show".to_string(),
+                TypeScheme::poly(vec![a], Type::arrow(Type::Var(a), Type::string())),
+            )],
+        );
+        self.insert_class(show_class);
+
+        // Show instances
+        self.insert_instance(ClassInstance::with_methods(
+            "Show",
+            Type::int(),
+            vec![("show".to_string(), "intToString".to_string())],
+        ));
+        self.insert_instance(ClassInstance::with_methods(
+            "Show",
+            Type::float(),
+            vec![("show".to_string(), "floatToString".to_string())],
+        ));
+        self.insert_instance(ClassInstance::with_methods(
+            "Show",
+            Type::char(),
+            vec![("show".to_string(), "charToString".to_string())],
+        ));
+        self.insert_instance(ClassInstance::with_methods(
+            "Show",
+            Type::string(),
+            vec![("show".to_string(), "__string_identity".to_string())],
+        ));
+        self.insert_instance(ClassInstance::with_methods(
+            "Show",
+            Type::bool(),
+            vec![("show".to_string(), "__bool_to_string".to_string())],
+        ));
+
+        // Identity function for string (show on string returns itself)
+        self.bindings.insert(
+            "__string_identity".to_string(),
+            TypeScheme::mono(Type::arrow(Type::string(), Type::string())),
+        );
+
+        // Bool to string conversion
+        self.bindings.insert(
+            "__bool_to_string".to_string(),
+            TypeScheme::mono(Type::arrow(Type::bool(), Type::string())),
+        );
+
+        // ========== Eq class ==========
+        // eq: 'a -> 'a -> bool
+        let a = TypeVar::fresh();
+        let eq_class = TypeClass::with_methods(
+            "Eq",
+            vec![(
+                "eq".to_string(),
+                TypeScheme::poly(
+                    vec![a],
+                    Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::bool()),
+                ),
+            )],
+        );
+        self.insert_class(eq_class);
+
+        // Eq instances
+        for ty_name in &["int", "float", "char", "string", "bool"] {
+            let ty = match *ty_name {
+                "int" => Type::int(),
+                "float" => Type::float(),
+                "char" => Type::char(),
+                "string" => Type::string(),
+                "bool" => Type::bool(),
+                _ => unreachable!(),
+            };
+            self.insert_instance(ClassInstance::with_methods(
+                "Eq",
+                ty,
+                vec![("eq".to_string(), format!("__eq_{ty_name}"))],
+            ));
+        }
+
+        // Type-specific equality functions
+        for ty_name in &["int", "float", "char", "string", "bool"] {
+            let ty = match *ty_name {
+                "int" => Type::int(),
+                "float" => Type::float(),
+                "char" => Type::char(),
+                "string" => Type::string(),
+                "bool" => Type::bool(),
+                _ => unreachable!(),
+            };
+            self.bindings.insert(
+                format!("__eq_{ty_name}"),
+                TypeScheme::mono(Type::arrows(vec![ty.clone(), ty], Type::bool())),
+            );
+        }
+
+        // ========== Ord class ==========
+        // lt, le, gt, ge: 'a -> 'a -> bool
+        let a = TypeVar::fresh();
+        let ord_class = TypeClass::with_methods(
+            "Ord",
+            vec![
+                (
+                    "lt".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::bool()),
+                    ),
+                ),
+                (
+                    "le".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::bool()),
+                    ),
+                ),
+                (
+                    "gt".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::bool()),
+                    ),
+                ),
+                (
+                    "ge".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::bool()),
+                    ),
+                ),
+            ],
+        );
+        self.insert_class(ord_class);
+
+        // Ord instances
+        for ty_name in &["int", "float", "char", "string"] {
+            let ty = match *ty_name {
+                "int" => Type::int(),
+                "float" => Type::float(),
+                "char" => Type::char(),
+                "string" => Type::string(),
+                _ => unreachable!(),
+            };
+            self.insert_instance(ClassInstance::with_methods(
+                "Ord",
+                ty.clone(),
+                vec![
+                    ("lt".to_string(), format!("__lt_{ty_name}")),
+                    ("le".to_string(), format!("__le_{ty_name}")),
+                    ("gt".to_string(), format!("__gt_{ty_name}")),
+                    ("ge".to_string(), format!("__ge_{ty_name}")),
+                ],
+            ));
+
+            // Type-specific comparison functions
+            for op in &["lt", "le", "gt", "ge"] {
+                self.bindings.insert(
+                    format!("__{op}_{ty_name}"),
+                    TypeScheme::mono(Type::arrows(vec![ty.clone(), ty.clone()], Type::bool())),
+                );
+            }
+        }
+
+        // ========== Num class ==========
+        // add, sub, mul, div: 'a -> 'a -> 'a
+        // neg: 'a -> 'a
+        let a = TypeVar::fresh();
+        let num_class = TypeClass::with_methods(
+            "Num",
+            vec![
+                (
+                    "add".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::Var(a)),
+                    ),
+                ),
+                (
+                    "sub".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::Var(a)),
+                    ),
+                ),
+                (
+                    "mul".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::Var(a)),
+                    ),
+                ),
+                (
+                    "div".to_string(),
+                    TypeScheme::poly(
+                        vec![a],
+                        Type::arrows(vec![Type::Var(a), Type::Var(a)], Type::Var(a)),
+                    ),
+                ),
+                (
+                    "neg".to_string(),
+                    TypeScheme::poly(vec![a], Type::arrow(Type::Var(a), Type::Var(a))),
+                ),
+            ],
+        );
+        self.insert_class(num_class);
+
+        // Num instances for int
+        self.insert_instance(ClassInstance::with_methods(
+            "Num",
+            Type::int(),
+            vec![
+                ("add".to_string(), "__add_int".to_string()),
+                ("sub".to_string(), "__sub_int".to_string()),
+                ("mul".to_string(), "__mul_int".to_string()),
+                ("div".to_string(), "__div_int".to_string()),
+                ("neg".to_string(), "__neg_int".to_string()),
+            ],
+        ));
+
+        // Num instances for float
+        self.insert_instance(ClassInstance::with_methods(
+            "Num",
+            Type::float(),
+            vec![
+                ("add".to_string(), "__add_float".to_string()),
+                ("sub".to_string(), "__sub_float".to_string()),
+                ("mul".to_string(), "__mul_float".to_string()),
+                ("div".to_string(), "__div_float".to_string()),
+                ("neg".to_string(), "__neg_float".to_string()),
+            ],
+        ));
     }
 
     // ========== Variable Bindings ==========

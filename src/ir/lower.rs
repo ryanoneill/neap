@@ -76,6 +76,15 @@ impl Lower {
         }
     }
 
+    /// Register a global variable binding (for REPL use).
+    ///
+    /// This adds the binding to the internal type checker's environment
+    /// so that `expr_type` can resolve it during lowering.
+    pub fn register_global(&mut self, name: &str, ty: Type) {
+        use crate::types::TypeScheme;
+        self.checker.register_global(name, TypeScheme::mono(ty));
+    }
+
     /// Get the type of an expression using local bindings.
     ///
     /// This avoids calling the type checker's infer_expr which doesn't

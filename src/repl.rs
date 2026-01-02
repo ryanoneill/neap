@@ -288,6 +288,9 @@ impl Repl {
                 // Store in VM globals
                 self.vm.define_global(&name, value.clone());
 
+                // Register with lowerer so future expressions can reference it
+                self.lowerer.register_global(&name, ty.clone());
+
                 Ok(EvalResult::ValDecl { name, ty, value })
             }
             Decl::Fun(fun_decl) => {
@@ -296,6 +299,9 @@ impl Repl {
                 // Get the type
                 let ty = self.checker.lookup_type(&name)
                     .ok_or_else(|| format!("Type not found for {name}"))?;
+
+                // Register with lowerer first so recursive calls work
+                self.lowerer.register_global(&name, ty.clone());
 
                 // Lower the function
                 let ir_decl = self.lowerer.lower_fun_standalone(fun_decl)

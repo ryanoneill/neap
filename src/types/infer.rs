@@ -81,6 +81,11 @@ impl TypeChecker {
         self.env.lookup(name).map(|scheme| scheme.ty.clone())
     }
 
+    /// Register a global variable binding (for REPL use).
+    pub fn register_global(&mut self, name: &str, scheme: TypeScheme) {
+        self.env.insert(name.to_string(), scheme);
+    }
+
     // ========== Declaration Type Checking ==========
 
     /// Check a single declaration (for REPL use).

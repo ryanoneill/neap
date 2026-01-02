@@ -176,6 +176,27 @@ impl Lower {
                 }
             }
 
+            Expr::Pipe(lhs, rhs) => {
+                // Check if both sides are commands - this is a shell pipeline
+                if matches!((&lhs.value, &rhs.value), (Expr::Command(_), Expr::Command(_))) {
+                    return Ok(Type::command_result());
+                }
+                // Check for chained pipeline
+                if let Expr::Pipe(inner_lhs, inner_rhs) = &lhs.value {
+                    if matches!(
+                        (&inner_lhs.value, &inner_rhs.value, &rhs.value),
+                        (Expr::Command(_), Expr::Command(_), Expr::Command(_))
+                    ) {
+                        return Ok(Type::command_result());
+                    }
+                }
+                // For function application, we'd need to decompose the arrow type
+                // This is complex, so fall through to error for now
+                Err(LowerError::Internal(
+                    "cannot determine pipe expression type".to_string(),
+                ))
+            }
+
             // For complex expressions, we need more context
             // Return an error so caller uses expected type instead
             _ => Err(LowerError::Internal(
@@ -447,6 +468,35 @@ impl Lower {
         Ok(IRExpr::Command {
             parts: ir_parts,
             stdin: None,
+            ty: ty.clone(),
+        })
+    }
+
+    /// Lower a shell command expression with stdin from a previous command.
+    fn lower_command_with_stdin(
+        &mut self,
+        parts: &[CommandPart],
+        stdin: IRExpr,
+        ty: &Type,
+    ) -> Result<IRExpr, LowerError> {
+        // Build the command parts into IR
+        let mut ir_parts = Vec::new();
+        for part in parts {
+            match part {
+                CommandPart::Literal(s) => {
+                    ir_parts.push(IRCommandPart::Literal(s.clone()));
+                }
+                CommandPart::Interpolation(expr) => {
+                    let expr_ty = self.expr_type(expr)?;
+                    let ir_expr = self.lower_expr(expr, &expr_ty)?;
+                    ir_parts.push(IRCommandPart::Interpolation(Box::new(ir_expr)));
+                }
+            }
+        }
+
+        Ok(IRExpr::Command {
+            parts: ir_parts,
+            stdin: Some(Box::new(stdin)),
             ty: ty.clone(),
         })
     }
@@ -1131,13 +1181,39 @@ impl Lower {
     }
 
     /// Lower a pipe expression.
+    ///
+    /// For command pipelines (`cmd1` |> `cmd2`), pipes stdout of cmd1 to stdin of cmd2.
+    /// For function pipelines (x |> f), becomes function application f(x).
     fn lower_pipe(
         &mut self,
         lhs: &Spanned<Expr>,
         rhs: &Spanned<Expr>,
         result_ty: &Type,
     ) -> Result<IRExpr, LowerError> {
-        // e1 |> e2  =>  e2 e1
+        // Check if both sides are commands - if so, create a shell pipeline
+        if let (Expr::Command(lhs_parts), Expr::Command(rhs_parts)) = (&lhs.value, &rhs.value) {
+            // Lower the left command first
+            let ir_lhs = self.lower_command(lhs_parts, &Type::command_result())?;
+            // Lower the right command with lhs as stdin
+            return self.lower_command_with_stdin(rhs_parts, ir_lhs, result_ty);
+        }
+
+        // Check for chained pipeline: (cmd1 |> cmd2) |> cmd3
+        // The LHS would be a Pipe expression where both sides are commands
+        if let Expr::Pipe(pipe_lhs, pipe_rhs) = &lhs.value {
+            if let Expr::Command(rhs_parts) = &rhs.value {
+                // Check if the inner pipe is a command pipeline
+                if matches!((&pipe_lhs.value, &pipe_rhs.value), (Expr::Command(_), Expr::Command(_)))
+                {
+                    // Lower the left pipeline first
+                    let ir_lhs = self.lower_pipe(pipe_lhs, pipe_rhs, &Type::command_result())?;
+                    // Lower the right command with lhs as stdin
+                    return self.lower_command_with_stdin(rhs_parts, ir_lhs, result_ty);
+                }
+            }
+        }
+
+        // Regular function application: e1 |> e2  =>  e2 e1
         let lhs_ty = self.expr_type(lhs)?;
         let rhs_ty = Type::arrow(lhs_ty.clone(), result_ty.clone());
 

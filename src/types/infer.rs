@@ -658,6 +658,32 @@ impl TypeChecker {
     }
 
     fn infer_pipe(&mut self, lhs: &Spanned<Expr>, rhs: &Spanned<Expr>) -> Result<Type, TypeError> {
+        use crate::syntax::Expr;
+
+        // Check if both sides are commands - if so, this is a shell pipeline
+        if matches!((&lhs.value, &rhs.value), (Expr::Command(_), Expr::Command(_))) {
+            // Infer types of both commands (to check interpolations)
+            self.infer(lhs)?;
+            self.infer(rhs)?;
+            // Result is CommandResult
+            return Ok(Type::command_result());
+        }
+
+        // Check for chained pipeline: (cmd1 |> cmd2) |> cmd3
+        if let Expr::Pipe(inner_lhs, inner_rhs) = &lhs.value {
+            if matches!(
+                (&inner_lhs.value, &inner_rhs.value, &rhs.value),
+                (Expr::Command(_), Expr::Command(_), Expr::Command(_))
+            ) {
+                // Infer types of all commands
+                self.infer(inner_lhs)?;
+                self.infer(inner_rhs)?;
+                self.infer(rhs)?;
+                // Result is CommandResult
+                return Ok(Type::command_result());
+            }
+        }
+
         // x |> f  is equivalent to  f x
         let lhs_ty = self.infer(lhs)?;
         let rhs_ty = self.infer(rhs)?;

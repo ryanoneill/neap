@@ -96,3 +96,50 @@ fn test_command_exit_code() {
     let output = run_program(source).expect("Program should run");
     assert!(output.contains("success"), "Output was: {}", output);
 }
+
+// ========== Command Pipeline Tests ==========
+
+#[test]
+fn test_command_pipeline() {
+    // Simple pipeline: echo | grep
+    let source = r#"
+        fun main x =
+            let result = `echo hello world` |> `grep world` in
+            result.stdout
+        val out = main 1
+        val p = print out
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("hello world"), "Output was: {}", output);
+}
+
+#[test]
+fn test_command_pipeline_filtering() {
+    // Pipeline that filters content
+    let source = r#"
+        fun main x =
+            let result = `echo hello` |> `cat` in
+            result.stdout
+        val out = main 1
+        val p = print out
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("hello"), "Output was: {}", output);
+}
+
+#[test]
+fn test_command_pipeline_exit_code() {
+    // The exit code should be from the last command in the pipeline
+    let source = r#"
+        fun main x =
+            let result = `echo test` |> `cat` in
+            result.exitCode
+        val code = main 1
+        val p = print (if code = 0 then "success" else "failure")
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("success"), "Output was: {}", output);
+}

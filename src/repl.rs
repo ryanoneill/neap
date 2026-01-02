@@ -269,12 +269,12 @@ impl Repl {
                 // Get the name from the pattern
                 let name = self.get_pattern_name(&val_decl.pattern)?;
 
-                // Get the type
+                // Get the type (which was added to the env during check_decl)
                 let ty = self.checker.lookup_type(&name)
                     .ok_or_else(|| format!("Type not found for {name}"))?;
 
-                // Lower the expression
-                let ir_expr = self.lowerer.lower_expr_standalone(&val_decl.expr)
+                // Lower the expression with the known type
+                let ir_expr = self.lowerer.lower_expr_with_type(&val_decl.expr, &ty)
                     .map_err(|e| e.to_string())?;
 
                 // Optimize
@@ -340,8 +340,8 @@ impl Repl {
         // Type check
         let ty = self.checker.infer_expr(&expr).map_err(|e| e.to_string())?;
 
-        // Lower
-        let ir_expr = self.lowerer.lower_expr_standalone(&expr)
+        // Lower with the inferred type
+        let ir_expr = self.lowerer.lower_expr_with_type(&expr, &ty)
             .map_err(|e| e.to_string())?;
 
         // Optimize

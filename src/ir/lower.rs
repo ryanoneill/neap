@@ -243,12 +243,11 @@ impl Lower {
         Ok(IRProgram::new(decls))
     }
 
-    /// Lower a standalone expression (for REPL use).
+    /// Lower a standalone expression with a known type (for REPL use).
     ///
-    /// This infers the type and then lowers the expression.
-    pub fn lower_expr_standalone(&mut self, expr: &Spanned<Expr>) -> Result<IRExpr, LowerError> {
-        let ty = self.checker.infer_expr(expr).map_err(|e| LowerError::TypeError(vec![e]))?;
-        self.lower_expr(expr, &ty)
+    /// The type should be pre-computed by the caller's type checker.
+    pub fn lower_expr_with_type(&mut self, expr: &Spanned<Expr>, ty: &Type) -> Result<IRExpr, LowerError> {
+        self.lower_expr(expr, ty)
     }
 
     /// Lower a standalone function declaration (for REPL use).

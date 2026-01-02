@@ -52,8 +52,10 @@ fn main() {
             run_file(&args[2]);
         }
         "repl" => {
-            eprintln!("Command 'repl' not yet implemented");
-            process::exit(1);
+            if let Err(e) = neap::repl::run() {
+                eprintln!("REPL error: {e}");
+                process::exit(1);
+            }
         }
         cmd => {
             eprintln!("Unknown command: {cmd}");

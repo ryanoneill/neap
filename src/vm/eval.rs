@@ -80,6 +80,20 @@ impl<W: Write, R: BufRead> VM<W, R> {
         Ok(())
     }
 
+    /// Evaluate a standalone expression (for REPL use).
+    ///
+    /// Global variables are accessed via IRExpr::Global, so we just
+    /// need an empty local environment.
+    pub fn eval_expr_standalone(&mut self, expr: &IRExpr) -> Result<Value, RuntimeError> {
+        let env = Rc::new(Env::new());
+        self.eval_expr(expr, &env)
+    }
+
+    /// Evaluate a standalone declaration (for REPL use).
+    pub fn eval_decl_standalone(&mut self, decl: &IRDecl) -> Result<(), RuntimeError> {
+        self.eval_decl(decl)
+    }
+
     /// Evaluate a declaration.
     fn eval_decl(&mut self, decl: &IRDecl) -> Result<(), RuntimeError> {
         match decl {

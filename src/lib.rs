@@ -5,6 +5,7 @@
 //! and shell integration via bytecode VM with shell FFI.
 
 pub mod ir;
+pub mod repl;
 pub mod syntax;
 pub mod types;
 pub mod vm;

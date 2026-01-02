@@ -13,6 +13,9 @@ thiserror = "2.0"
 # Error reporting with nice diagnostics
 ariadne = "0.4"
 
+# Line editing for REPL
+rustyline = "15"
+
 [dev-dependencies]
 # Property-based testing
 proptest = "1.5"

@@ -89,7 +89,8 @@ impl Parser {
 
     // ========== Declaration Parsing ==========
 
-    fn parse_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
+    /// Parse a single declaration.
+    pub fn parse_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
         match self.peek_kind() {
             Some(TokenKind::Val) => self.parse_val_decl(),
             Some(TokenKind::Let) => self.parse_let_decl(),

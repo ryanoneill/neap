@@ -59,19 +59,25 @@ impl Optimizer {
     fn optimize_decl(&self, decl: IRDecl) -> (IRDecl, bool) {
         match decl {
             IRDecl::Val { name, ty, value } => {
-                let (new_value, changed) = self.optimize_expr(value);
+                let (new_value, changed) = self.optimize_expr_internal(value);
                 (IRDecl::Val { name, ty, value: new_value }, changed)
             }
             IRDecl::Fun { name, ty, params, body } => {
-                let (new_body, changed) = self.optimize_expr(body);
+                let (new_body, changed) = self.optimize_expr_internal(body);
                 (IRDecl::Fun { name, ty, params, body: new_body }, changed)
             }
             IRDecl::Data { .. } => (decl, false),
         }
     }
 
-    /// Optimize an expression.
-    fn optimize_expr(&self, expr: IRExpr) -> (IRExpr, bool) {
+    /// Optimize a standalone expression (for REPL use).
+    pub fn optimize_expr(&self, expr: IRExpr) -> IRExpr {
+        let (optimized, _) = self.optimize_expr_internal(expr);
+        optimized
+    }
+
+    /// Optimize an expression (internal, returns changed flag).
+    fn optimize_expr_internal(&self, expr: IRExpr) -> (IRExpr, bool) {
         // First, recursively optimize subexpressions
         let (expr, mut changed) = self.optimize_subexprs(expr);
 
@@ -95,8 +101,8 @@ impl Optimizer {
     fn optimize_subexprs(&self, expr: IRExpr) -> (IRExpr, bool) {
         match expr {
             IRExpr::Let { var, ty, value, body } => {
-                let (new_value, c1) = self.optimize_expr(*value);
-                let (new_body, c2) = self.optimize_expr(*body);
+                let (new_value, c1) = self.optimize_expr_internal(*value);
+                let (new_body, c2) = self.optimize_expr_internal(*body);
                 (
                     IRExpr::Let {
                         var,
@@ -113,7 +119,7 @@ impl Optimizer {
                 let new_bindings: Vec<Binding> = bindings
                     .into_iter()
                     .map(|b| {
-                        let (new_value, c) = self.optimize_expr(b.value);
+                        let (new_value, c) = self.optimize_expr_internal(b.value);
                         changed |= c;
                         Binding {
                             var: b.var,
@@ -122,7 +128,7 @@ impl Optimizer {
                         }
                     })
                     .collect();
-                let (new_body, c) = self.optimize_expr(*body);
+                let (new_body, c) = self.optimize_expr_internal(*body);
                 changed |= c;
                 (
                     IRExpr::LetRec {
@@ -134,7 +140,7 @@ impl Optimizer {
             }
 
             IRExpr::Lambda { param, param_ty, body, result_ty } => {
-                let (new_body, changed) = self.optimize_expr(*body);
+                let (new_body, changed) = self.optimize_expr_internal(*body);
                 (
                     IRExpr::Lambda {
                         param,
@@ -147,8 +153,8 @@ impl Optimizer {
             }
 
             IRExpr::App { func, arg, result_ty } => {
-                let (new_func, c1) = self.optimize_expr(*func);
-                let (new_arg, c2) = self.optimize_expr(*arg);
+                let (new_func, c1) = self.optimize_expr_internal(*func);
+                let (new_arg, c2) = self.optimize_expr_internal(*arg);
                 (
                     IRExpr::App {
                         func: Box::new(new_func),
@@ -160,9 +166,9 @@ impl Optimizer {
             }
 
             IRExpr::If { cond, then_branch, else_branch, ty } => {
-                let (new_cond, c1) = self.optimize_expr(*cond);
-                let (new_then, c2) = self.optimize_expr(*then_branch);
-                let (new_else, c3) = self.optimize_expr(*else_branch);
+                let (new_cond, c1) = self.optimize_expr_internal(*cond);
+                let (new_then, c2) = self.optimize_expr_internal(*then_branch);
+                let (new_else, c3) = self.optimize_expr_internal(*else_branch);
                 (
                     IRExpr::If {
                         cond: Box::new(new_cond),
@@ -175,12 +181,12 @@ impl Optimizer {
             }
 
             IRExpr::Match { scrutinee, arms, ty } => {
-                let (new_scrutinee, c1) = self.optimize_expr(*scrutinee);
+                let (new_scrutinee, c1) = self.optimize_expr_internal(*scrutinee);
                 let mut changed = c1;
                 let new_arms: Vec<_> = arms
                     .into_iter()
                     .map(|(pat, body)| {
-                        let (new_body, c) = self.optimize_expr(body);
+                        let (new_body, c) = self.optimize_expr_internal(body);
                         changed |= c;
                         (pat, new_body)
                     })
@@ -200,7 +206,7 @@ impl Optimizer {
                 let new_args: Vec<_> = args
                     .into_iter()
                     .map(|arg| {
-                        let (new_arg, c) = self.optimize_expr(arg);
+                        let (new_arg, c) = self.optimize_expr_internal(arg);
                         changed |= c;
                         new_arg
                     })
@@ -210,7 +216,7 @@ impl Optimizer {
 
             IRExpr::Construct { ctor, arg, ty } => {
                 if let Some(a) = arg {
-                    let (new_arg, changed) = self.optimize_expr(*a);
+                    let (new_arg, changed) = self.optimize_expr_internal(*a);
                     (
                         IRExpr::Construct {
                             ctor,
@@ -229,7 +235,7 @@ impl Optimizer {
                 let new_elems: Vec<_> = elems
                     .into_iter()
                     .map(|e| {
-                        let (new_e, c) = self.optimize_expr(e);
+                        let (new_e, c) = self.optimize_expr_internal(e);
                         changed |= c;
                         new_e
                     })
@@ -238,7 +244,7 @@ impl Optimizer {
             }
 
             IRExpr::TupleProj { tuple, index, ty } => {
-                let (new_tuple, changed) = self.optimize_expr(*tuple);
+                let (new_tuple, changed) = self.optimize_expr_internal(*tuple);
                 (
                     IRExpr::TupleProj {
                         tuple: Box::new(new_tuple),
@@ -254,7 +260,7 @@ impl Optimizer {
                 let new_fields: Vec<_> = fields
                     .into_iter()
                     .map(|(name, e)| {
-                        let (new_e, c) = self.optimize_expr(e);
+                        let (new_e, c) = self.optimize_expr_internal(e);
                         changed |= c;
                         (name, new_e)
                     })
@@ -263,7 +269,7 @@ impl Optimizer {
             }
 
             IRExpr::Field { record, field, ty } => {
-                let (new_record, changed) = self.optimize_expr(*record);
+                let (new_record, changed) = self.optimize_expr_internal(*record);
                 (
                     IRExpr::Field {
                         record: Box::new(new_record),
@@ -282,7 +288,7 @@ impl Optimizer {
             // Commands are passed through (we could optimize interpolations in the future)
             IRExpr::Command { parts, stdin, ty } => {
                 let (opt_stdin, stdin_changed) = if let Some(s) = stdin {
-                    let (opt_s, changed) = self.optimize_expr(*s);
+                    let (opt_s, changed) = self.optimize_expr_internal(*s);
                     (Some(Box::new(opt_s)), changed)
                 } else {
                     (None, false)

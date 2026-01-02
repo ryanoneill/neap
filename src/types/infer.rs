@@ -75,9 +75,16 @@ impl TypeChecker {
         &self.env
     }
 
+    /// Look up the type of a name in the environment.
+    #[must_use]
+    pub fn lookup_type(&self, name: &str) -> Option<Type> {
+        self.env.lookup(name).map(|scheme| scheme.ty.clone())
+    }
+
     // ========== Declaration Type Checking ==========
 
-    fn check_decl(&mut self, decl: &Spanned<Decl>) -> Result<(), TypeError> {
+    /// Check a single declaration (for REPL use).
+    pub fn check_decl(&mut self, decl: &Spanned<Decl>) -> Result<(), TypeError> {
         match &decl.value {
             Decl::Val(val) => self.check_val_decl(val, decl.span),
             Decl::Fun(fun) => self.check_fun_decl(fun, decl.span),

@@ -243,6 +243,22 @@ impl Lower {
         Ok(IRProgram::new(decls))
     }
 
+    /// Lower a standalone expression (for REPL use).
+    ///
+    /// This infers the type and then lowers the expression.
+    pub fn lower_expr_standalone(&mut self, expr: &Spanned<Expr>) -> Result<IRExpr, LowerError> {
+        let ty = self.checker.infer_expr(expr).map_err(|e| LowerError::TypeError(vec![e]))?;
+        self.lower_expr(expr, &ty)
+    }
+
+    /// Lower a standalone function declaration (for REPL use).
+    ///
+    /// Note: The declaration must already be type-checked.
+    pub fn lower_fun_standalone(&mut self, fun_decl: &FunDecl) -> Result<IRDecl, LowerError> {
+        self.lower_fun_decl(fun_decl)?
+            .ok_or_else(|| LowerError::Internal("Failed to lower function".to_string()))
+    }
+
     /// Lower a declaration.
     fn lower_decl(&mut self, decl: &Decl) -> Result<Option<IRDecl>, LowerError> {
         match decl {

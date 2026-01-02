@@ -1389,8 +1389,8 @@ mod tests {
     // ========== Declaration Tests ==========
 
     #[test]
-    fn check_val() {
-        let result = check("val x = 1");
+    fn check_let_decl() {
+        let result = check("let x = 1");
         assert!(result.is_ok());
     }
 
@@ -1410,8 +1410,8 @@ mod tests {
     fn check_multiple() {
         let result = check(
             r#"
-            val x = 1
-            val y = x + 1
+            let x = 1
+            let y = x + 1
             fun double n = n * 2
         "#,
         );
@@ -1432,8 +1432,8 @@ mod tests {
         // Interpolation with string value
         let result = check(
             r#"
-            val file = "README.md"
-            val result = `cat {file}`
+            let file = "README.md"
+            let result = `cat {file}`
         "#,
         );
         assert!(result.is_ok());
@@ -1470,9 +1470,9 @@ mod tests {
     }
 
     #[test]
-    fn check_show_in_val() {
-        // Using show in a val binding
-        let result = check("val s = show 42");
+    fn check_show_in_let() {
+        // Using show in a let binding
+        let result = check("let s = show 42");
         assert!(result.is_ok());
     }
 
@@ -1482,7 +1482,7 @@ mod tests {
         let result = check(
             r#"
             fun showTwice x = show x ++ " " ++ show x
-            val result = showTwice 5
+            let result = showTwice 5
         "#,
         );
         assert!(result.is_ok());

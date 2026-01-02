@@ -42,10 +42,10 @@ fn run_program(source: &str) -> Result<String, String> {
 fn test_simple_command() {
     // Just run a command - verify we can capture and store result
     let source = r#"
-        val result = `echo hello`
+        let result = `echo hello`
         fun getOut x = result.stdout
-        val out = getOut 1
-        val p = print out
+        let out = getOut 1
+        let p = print out
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -59,8 +59,8 @@ fn test_command_stdout_field() {
         fun main x =
             let result = `echo hello` in
             result.stdout
-        val out = main 1
-        val p = print out
+        let out = main 1
+        let p = print out
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -74,8 +74,8 @@ fn test_command_with_interpolation() {
             let name = "world" in
             let result = `echo {name}` in
             result.stdout
-        val out = main 1
-        val p = print out
+        let out = main 1
+        let p = print out
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -89,8 +89,8 @@ fn test_command_exit_code() {
             let result = `echo test` in
             let code = result.exitCode in
             if code = 0 then "success" else "failure"
-        val msg = main 1
-        val p = print msg
+        let msg = main 1
+        let p = print msg
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -106,8 +106,8 @@ fn test_command_pipeline() {
         fun main x =
             let result = `echo hello world` |> `grep world` in
             result.stdout
-        val out = main 1
-        val p = print out
+        let out = main 1
+        let p = print out
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -121,8 +121,8 @@ fn test_command_pipeline_filtering() {
         fun main x =
             let result = `echo hello` |> `cat` in
             result.stdout
-        val out = main 1
-        val p = print out
+        let out = main 1
+        let p = print out
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -136,8 +136,8 @@ fn test_command_pipeline_exit_code() {
         fun main x =
             let result = `echo test` |> `cat` in
             result.exitCode
-        val code = main 1
-        val p = print (if code = 0 then "success" else "failure")
+        let code = main 1
+        let p = print (if code = 0 then "success" else "failure")
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -149,8 +149,8 @@ fn test_command_pipeline_exit_code() {
 #[test]
 fn test_show_int() {
     let source = r#"
-        val s = show 42
-        val p = print s
+        let s = show 42
+        let p = print s
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -160,8 +160,8 @@ fn test_show_int() {
 #[test]
 fn test_show_float() {
     let source = r#"
-        val s = show 3.14
-        val p = print s
+        let s = show 3.14
+        let p = print s
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -171,8 +171,8 @@ fn test_show_float() {
 #[test]
 fn test_show_bool() {
     let source = r#"
-        val s = show true
-        val p = print s
+        let s = show true
+        let p = print s
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -182,8 +182,8 @@ fn test_show_bool() {
 #[test]
 fn test_show_string() {
     let source = r#"
-        val s = show "hello"
-        val p = print s
+        let s = show "hello"
+        let p = print s
     "#;
 
     let output = run_program(source).expect("Program should run");
@@ -194,8 +194,8 @@ fn test_show_string() {
 fn test_show_in_expression() {
     // Use show in a larger expression
     let source = r#"
-        val s = "The answer is: " ++ show 42
-        val p = print s
+        let s = "The answer is: " ++ show 42
+        let p = print s
     "#;
 
     let output = run_program(source).expect("Program should run");

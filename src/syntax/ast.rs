@@ -15,7 +15,7 @@ pub struct Program {
 /// A top-level declaration.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
-    /// Value binding: `let x = e` or `val x = e`
+    /// Value binding: `let x = e`
     Val(ValDecl),
 
     /// Function binding: `fun f x = e`

@@ -752,7 +752,7 @@ mod tests {
 
     #[test]
     fn keywords() {
-        let tokens = token_kinds("let in fn fun val rec and match with case of").unwrap();
+        let tokens = token_kinds("let in fn fun rec and match with case of").unwrap();
         assert_eq!(
             tokens,
             vec![
@@ -760,7 +760,6 @@ mod tests {
                 TokenKind::In,
                 TokenKind::Fn,
                 TokenKind::Fun,
-                TokenKind::Val,
                 TokenKind::Rec,
                 TokenKind::And,
                 TokenKind::Match,

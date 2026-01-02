@@ -34,8 +34,6 @@ pub enum TokenKind {
     Fn,
     /// `fun` - named function
     Fun,
-    /// `val` - value declaration
-    Val,
     /// `rec` - recursive binding
     Rec,
     /// `and` - parallel bindings
@@ -196,7 +194,6 @@ impl TokenKind {
                 | Self::In
                 | Self::Fn
                 | Self::Fun
-                | Self::Val
                 | Self::Rec
                 | Self::And
                 | Self::Match
@@ -289,7 +286,6 @@ impl TokenKind {
             "in" => Some(Self::In),
             "fn" => Some(Self::Fn),
             "fun" => Some(Self::Fun),
-            "val" => Some(Self::Val),
             "rec" => Some(Self::Rec),
             "and" => Some(Self::And),
             "match" => Some(Self::Match),
@@ -323,7 +319,6 @@ impl TokenKind {
             Self::In => "in",
             Self::Fn => "fn",
             Self::Fun => "fun",
-            Self::Val => "val",
             Self::Rec => "rec",
             Self::And => "and",
             Self::Match => "match",

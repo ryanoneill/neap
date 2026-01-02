@@ -327,7 +327,7 @@ impl Lower {
             .checker
             .env()
             .lookup(&name)
-            .ok_or_else(|| LowerError::Internal(format!("val {name} not in environment")))?;
+            .ok_or_else(|| LowerError::Internal(format!("let {name} not in environment")))?;
         let ty = scheme.instantiate();
 
         // Lower the expression

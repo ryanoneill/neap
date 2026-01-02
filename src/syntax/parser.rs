@@ -92,7 +92,6 @@ impl Parser {
     /// Parse a single declaration.
     pub fn parse_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
         match self.peek_kind() {
-            Some(TokenKind::Val) => self.parse_val_decl(),
             Some(TokenKind::Let) => self.parse_let_decl(),
             Some(TokenKind::Fun) => self.parse_fun_decl(),
             Some(TokenKind::Type) => self.parse_type_decl(),
@@ -102,7 +101,7 @@ impl Parser {
             Some(_) => {
                 let token = self.peek().unwrap();
                 Err(ParseError::UnexpectedToken {
-                    expected: "declaration (val, let, fun, type, datatype, trait, or impl)"
+                    expected: "declaration (let, fun, type, datatype, trait, or impl)"
                         .to_string(),
                     found: token.kind.name().to_string(),
                     span: token.span,
@@ -112,34 +111,6 @@ impl Parser {
                 expected: "declaration".to_string(),
             }),
         }
-    }
-
-    fn parse_val_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
-        let start = self.expect(TokenKind::Val)?.span;
-
-        let rec = self.eat(TokenKind::Rec);
-
-        let pattern = self.parse_pattern()?;
-
-        let ty = if self.eat(TokenKind::Colon) {
-            Some(self.parse_type()?)
-        } else {
-            None
-        };
-
-        self.expect(TokenKind::Eq)?;
-        let expr = self.parse_expr()?;
-
-        let span = start.merge(expr.span);
-        Ok(Spanned::new(
-            Decl::Val(ValDecl {
-                rec,
-                pattern,
-                ty,
-                expr,
-            }),
-            span,
-        ))
     }
 
     fn parse_let_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
@@ -2154,13 +2125,6 @@ mod tests {
     // ========== Declaration Tests ==========
 
     #[test]
-    fn parse_val_decl() {
-        let program = parse_program("val x = 42").unwrap();
-        assert_eq!(program.decls.len(), 1);
-        assert!(matches!(program.decls[0].value, Decl::Val(_)));
-    }
-
-    #[test]
     fn parse_let_decl() {
         let program = parse_program("let x = 42").unwrap();
         assert_eq!(program.decls.len(), 1);
@@ -2303,8 +2267,8 @@ mod tests {
     #[test]
     fn parse_multiple_decls() {
         let source = r#"
-            val x = 1
-            val y = 2
+            let x = 1
+            let y = 2
             fun add a b = a + b
         "#;
         let program = parse_program(source).unwrap();

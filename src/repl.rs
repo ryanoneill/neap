@@ -193,7 +193,7 @@ impl Repl {
         println!();
         println!("Enter expressions to evaluate, or declarations to define:");
         println!("  1 + 2              Expression (prints result)");
-        println!("  val x = 42         Value declaration");
+        println!("  let x = 42         Value declaration");
         println!("  fun double n = n * 2   Function declaration");
         println!();
         println!("Keyboard shortcuts:");

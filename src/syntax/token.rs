@@ -94,6 +94,8 @@ pub enum TokenKind {
     // ========== Operators ==========
     /// `+` - addition
     Plus,
+    /// `++` - string/list concatenation (Haskell-style)
+    PlusPlus,
     /// `-` - subtraction
     Minus,
     /// `*` - multiplication
@@ -348,6 +350,7 @@ impl TokenKind {
             Self::Backtick => "`",
             Self::CommandText(_) => "command text",
             Self::Plus => "+",
+            Self::PlusPlus => "++",
             Self::Minus => "-",
             Self::Star => "*",
             Self::Slash => "/",

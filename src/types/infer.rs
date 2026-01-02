@@ -1234,7 +1234,7 @@ mod tests {
 
     #[test]
     fn infer_concat() {
-        let ty = infer(r#""hello" ^ " world""#).unwrap();
+        let ty = infer(r#""hello" ++ " world""#).unwrap();
         assert_eq!(ty, Type::string());
     }
 
@@ -1469,7 +1469,7 @@ mod tests {
         // Using show in a function
         let result = check(
             r#"
-            fun showTwice x = show x ^ " " ^ show x
+            fun showTwice x = show x ++ " " ++ show x
             val result = showTwice 5
         "#,
         );

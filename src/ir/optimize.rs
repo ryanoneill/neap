@@ -1082,7 +1082,7 @@ mod tests {
 
     #[test]
     fn optimize_constant_string_concat() {
-        let ir = lower_and_optimize("let s = \"hello\" ^ \" world\"");
+        let ir = lower_and_optimize("let s = \"hello\" ++ \" world\"");
 
         match &ir.decls[0] {
             IRDecl::Val { value, .. } => {

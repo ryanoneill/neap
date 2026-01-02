@@ -645,6 +645,9 @@ impl<'src> Lexer<'src> {
         if self.rest.starts_with("||") {
             return make_token(TokenKind::OrElse, 2, self);
         }
+        if self.rest.starts_with("++") {
+            return make_token(TokenKind::PlusPlus, 2, self);
+        }
 
         // Single-character operators and punctuation
         let ch = self.peek_char().unwrap();
@@ -1070,6 +1073,21 @@ mod tests {
         assert_eq!(
             tokens,
             vec![TokenKind::ColonColon, TokenKind::At, TokenKind::Eof,]
+        );
+    }
+
+    #[test]
+    fn concat_operator() {
+        let tokens = token_kinds("++ \"a\" ++ \"b\"").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::PlusPlus,
+                TokenKind::String("a".to_string()),
+                TokenKind::PlusPlus,
+                TokenKind::String("b".to_string()),
+                TokenKind::Eof,
+            ]
         );
     }
 

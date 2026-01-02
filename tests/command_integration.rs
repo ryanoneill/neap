@@ -194,7 +194,7 @@ fn test_show_string() {
 fn test_show_in_expression() {
     // Use show in a larger expression
     let source = r#"
-        val s = "The answer is: " ^ show 42
+        val s = "The answer is: " ++ show 42
         val p = print s
     "#;
 

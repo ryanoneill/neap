@@ -1027,7 +1027,7 @@ impl Parser {
                     span,
                 ))
             }
-            TokenKind::Caret => {
+            TokenKind::PlusPlus => {
                 let rhs = self.parse_expr_bp(r_bp)?;
                 let span = lhs.span.merge(rhs.span);
                 Ok(Spanned::new(
@@ -1586,8 +1586,8 @@ fn infix_binding_power(op: &TokenKind) -> Option<(u8, u8)> {
         // Append (right-associative)
         TokenKind::At => (10, 9),
 
-        // String concatenation
-        TokenKind::Caret => (11, 12),
+        // String/list concatenation (Haskell-style ++)
+        TokenKind::PlusPlus => (11, 12),
 
         // Addition and subtraction
         TokenKind::Plus | TokenKind::Minus => (13, 14),

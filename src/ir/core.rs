@@ -375,6 +375,8 @@ pub enum Primitive {
     CharToString,
     CharToInt,
     IntToChar,
+    BoolToString,
+    StringIdentity,
 
     // List operations
     ListLength,
@@ -450,6 +452,8 @@ impl Primitive {
             Self::CharToString => "__char_to_string",
             Self::CharToInt => "__char_to_int",
             Self::IntToChar => "__int_to_char",
+            Self::BoolToString => "__bool_to_string",
+            Self::StringIdentity => "__string_identity",
             Self::ListLength => "__list_length",
             Self::Print => "print",
             Self::PrintNoNewline => "__print_no_newline",
@@ -478,6 +482,8 @@ impl Primitive {
             | Self::CharToString
             | Self::CharToInt
             | Self::IntToChar
+            | Self::BoolToString
+            | Self::StringIdentity
             | Self::ListLength
             | Self::Print
             | Self::PrintNoNewline

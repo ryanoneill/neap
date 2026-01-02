@@ -143,3 +143,61 @@ fn test_command_pipeline_exit_code() {
     let output = run_program(source).expect("Program should run");
     assert!(output.contains("success"), "Output was: {}", output);
 }
+
+// ========== Type Class Tests ==========
+
+#[test]
+fn test_show_int() {
+    let source = r#"
+        val s = show 42
+        val p = print s
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("42"), "Output was: {}", output);
+}
+
+#[test]
+fn test_show_float() {
+    let source = r#"
+        val s = show 3.14
+        val p = print s
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("3.14"), "Output was: {}", output);
+}
+
+#[test]
+fn test_show_bool() {
+    let source = r#"
+        val s = show true
+        val p = print s
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("true"), "Output was: {}", output);
+}
+
+#[test]
+fn test_show_string() {
+    let source = r#"
+        val s = show "hello"
+        val p = print s
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("hello"), "Output was: {}", output);
+}
+
+#[test]
+fn test_show_in_expression() {
+    // Use show in a larger expression
+    let source = r#"
+        val s = "The answer is: " ^ show 42
+        val p = print s
+    "#;
+
+    let output = run_program(source).expect("Program should run");
+    assert!(output.contains("The answer is: 42"), "Output was: {}", output);
+}

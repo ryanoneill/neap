@@ -218,6 +218,23 @@ pub fn eval_primitive<W: Write, R: BufRead>(
             }
         }
 
+        Primitive::BoolToString => {
+            expect_args(1, args)?;
+            let b = args[0]
+                .as_bool()
+                .ok_or_else(|| type_error("bool", &args[0]))?;
+            Ok(Value::string(if b { "true" } else { "false" }))
+        }
+
+        Primitive::StringIdentity => {
+            expect_args(1, args)?;
+            // String identity - just return the string as-is
+            match &args[0] {
+                Value::String(_) => Ok(args[0].clone()),
+                v => Err(type_error("string", v)),
+            }
+        }
+
         // List operations
         Primitive::Cons => {
             expect_args(2, args)?;

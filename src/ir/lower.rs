@@ -541,6 +541,16 @@ impl Lower {
             });
         }
 
+        // Check if this is a trait method call
+        if let Expr::Var(name) = &func.value {
+            if let Some(impl_name) = self.resolve_trait_method(name, arg)? {
+                // Found a trait method - call the implementation function instead
+                if let Some(builtin) = self.lookup_builtin(&impl_name) {
+                    return self.lower_builtin_call(builtin, arg, result_ty);
+                }
+            }
+        }
+
         // Check if this is a built-in function call
         if let Expr::Var(name) = &func.value {
             if let Some(builtin) = self.lookup_builtin(name) {
@@ -567,6 +577,65 @@ impl Lower {
         })
     }
 
+    /// Resolve a trait method call to its implementation function.
+    ///
+    /// Returns the implementation function name if this is a trait method call,
+    /// or None if it's not a trait method.
+    fn resolve_trait_method(
+        &self,
+        method_name: &str,
+        arg: &Spanned<Expr>,
+    ) -> Result<Option<String>, LowerError> {
+        // Find which trait class this method belongs to
+        let class_name = self.find_trait_for_method(method_name);
+        let class_name = match class_name {
+            Some(name) => name,
+            None => return Ok(None),
+        };
+
+        // Get the argument type
+        let arg_ty = self.expr_type(arg)?;
+
+        // Find the instance for this type
+        let instance = self
+            .checker
+            .env()
+            .find_instance(&class_name, &arg_ty)
+            .ok_or_else(|| {
+                LowerError::Internal(format!(
+                    "no instance of '{}' for type {}",
+                    class_name, arg_ty
+                ))
+            })?;
+
+        // Look up the implementation function for this method
+        let impl_name = instance
+            .methods
+            .iter()
+            .find(|(name, _)| name == method_name)
+            .map(|(_, impl_name)| impl_name.clone())
+            .ok_or_else(|| {
+                LowerError::Internal(format!(
+                    "method '{}' not found in instance",
+                    method_name
+                ))
+            })?;
+
+        Ok(Some(impl_name))
+    }
+
+    /// Find which trait class a method belongs to.
+    fn find_trait_for_method(&self, method_name: &str) -> Option<String> {
+        for (class_name, class) in self.checker.env().type_classes_iter() {
+            for (name, _) in &class.methods {
+                if name == method_name {
+                    return Some(class_name.clone());
+                }
+            }
+        }
+        None
+    }
+
     /// Look up a built-in function by name.
     fn lookup_builtin(&self, name: &str) -> Option<Primitive> {
         match name {
@@ -578,6 +647,8 @@ impl Lower {
             "charToString" => Some(Primitive::CharToString),
             "charToInt" => Some(Primitive::CharToInt),
             "intToChar" => Some(Primitive::IntToChar),
+            "__bool_to_string" => Some(Primitive::BoolToString),
+            "__string_identity" => Some(Primitive::StringIdentity),
 
             // String operations
             "stringLength" => Some(Primitive::StringLength),
@@ -1702,6 +1773,74 @@ mod tests {
             IRDecl::Val { value, .. } => {
                 // Pipe should become application
                 assert!(matches!(value, IRExpr::App { .. }));
+            }
+            _ => panic!("expected val decl"),
+        }
+    }
+
+    // ========== Type Class Tests ==========
+
+    #[test]
+    fn lower_show_int() {
+        let ir = lower_program("let s = show 42").expect("lower error");
+
+        match &ir.decls[0] {
+            IRDecl::Val { name, value, .. } => {
+                assert_eq!(name, "s");
+                // show 42 should become intToString 42
+                assert!(matches!(value, IRExpr::Prim { op: Primitive::IntToString, .. }));
+            }
+            _ => panic!("expected val decl"),
+        }
+    }
+
+    #[test]
+    fn lower_show_float() {
+        let ir = lower_program("let s = show 3.14").expect("lower error");
+
+        match &ir.decls[0] {
+            IRDecl::Val { value, .. } => {
+                // show 3.14 should become floatToString 3.14
+                assert!(matches!(value, IRExpr::Prim { op: Primitive::FloatToString, .. }));
+            }
+            _ => panic!("expected val decl"),
+        }
+    }
+
+    #[test]
+    fn lower_show_bool() {
+        let ir = lower_program("let s = show true").expect("lower error");
+
+        match &ir.decls[0] {
+            IRDecl::Val { value, .. } => {
+                // show true should become __bool_to_string true
+                assert!(matches!(value, IRExpr::Prim { op: Primitive::BoolToString, .. }));
+            }
+            _ => panic!("expected val decl"),
+        }
+    }
+
+    #[test]
+    fn lower_show_string() {
+        let ir = lower_program("let s = show \"hello\"").expect("lower error");
+
+        match &ir.decls[0] {
+            IRDecl::Val { value, .. } => {
+                // show "hello" should become __string_identity "hello"
+                assert!(matches!(value, IRExpr::Prim { op: Primitive::StringIdentity, .. }));
+            }
+            _ => panic!("expected val decl"),
+        }
+    }
+
+    #[test]
+    fn lower_show_char() {
+        let ir = lower_program("let s = show #\"a\"").expect("lower error");
+
+        match &ir.decls[0] {
+            IRDecl::Val { value, .. } => {
+                // show #"a" should become charToString #"a"
+                assert!(matches!(value, IRExpr::Prim { op: Primitive::CharToString, .. }));
             }
             _ => panic!("expected val decl"),
         }

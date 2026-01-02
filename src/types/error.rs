@@ -95,6 +95,14 @@ pub enum TypeError {
     /// Invalid pattern for this context
     #[error("invalid pattern")]
     InvalidPattern { span: Span },
+
+    /// Missing type class instance
+    #[error("no instance of '{class_name}' for type {ty}")]
+    MissingInstance {
+        class_name: String,
+        ty: Type,
+        span: Span,
+    },
 }
 
 impl TypeError {
@@ -118,7 +126,8 @@ impl TypeError {
             | Self::RecursiveBindingWithoutRec { span, .. }
             | Self::DuplicateDefinition { span, .. }
             | Self::AnnotationMismatch { span, .. }
-            | Self::InvalidPattern { span, .. } => Some(*span),
+            | Self::InvalidPattern { span, .. }
+            | Self::MissingInstance { span, .. } => Some(*span),
         }
     }
 }

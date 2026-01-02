@@ -709,6 +709,11 @@ impl TypeEnv {
         })
     }
 
+    /// Iterate over all type classes.
+    pub fn type_classes_iter(&self) -> impl Iterator<Item = (&String, &TypeClass)> {
+        self.type_classes.iter()
+    }
+
     // ========== Type Scheme Operations ==========
 
     /// Get all free type variables in the environment.

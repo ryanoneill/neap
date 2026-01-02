@@ -10,7 +10,7 @@ use crate::syntax::{
 use super::env::TypeEnv;
 use super::error::TypeError;
 use super::subst::Substitution;
-use super::core::{Type, TypeScheme, TypeVar};
+use super::core::{Constraint, Type, TypeScheme, TypeVar};
 use super::unify::unify;
 
 /// The type checker.
@@ -21,6 +21,8 @@ pub struct TypeChecker {
     subst: Substitution,
     /// Collected errors (for error recovery)
     errors: Vec<TypeError>,
+    /// Collected type class constraints during inference
+    constraints: Vec<Constraint>,
 }
 
 impl TypeChecker {
@@ -31,6 +33,7 @@ impl TypeChecker {
             env: TypeEnv::with_builtins(),
             subst: Substitution::new(),
             errors: Vec::new(),
+            constraints: Vec::new(),
         }
     }
 
@@ -41,6 +44,7 @@ impl TypeChecker {
             env,
             subst: Substitution::new(),
             errors: Vec::new(),
+            constraints: Vec::new(),
         }
     }
 
@@ -120,6 +124,44 @@ impl TypeChecker {
         // Bind pattern variables
         self.bind_pattern(&decl.pattern, &final_ty)?;
 
+        // Verify that all collected constraints can be satisfied
+        self.verify_constraints(span)?;
+
+        Ok(())
+    }
+
+    /// Verify that all collected constraints can be satisfied.
+    ///
+    /// After type inference, we apply the accumulated substitution to the
+    /// constraints and check that instances exist for each concrete type.
+    fn verify_constraints(&mut self, span: Span) -> Result<(), TypeError> {
+        // Apply substitution to get concrete types
+        let constraints: Vec<_> = self
+            .constraints
+            .drain(..)
+            .map(|c| Constraint::new(c.class_name, self.subst.apply(&c.ty)))
+            .collect();
+
+        for constraint in constraints {
+            // Skip constraints on type variables (they're polymorphic)
+            if matches!(constraint.ty, Type::Var(_)) {
+                continue;
+            }
+
+            // Check that an instance exists
+            if self
+                .env
+                .find_instance(&constraint.class_name, &constraint.ty)
+                .is_none()
+            {
+                return Err(TypeError::MissingInstance {
+                    class_name: constraint.class_name,
+                    ty: constraint.ty,
+                    span,
+                });
+            }
+        }
+
         Ok(())
     }
 
@@ -175,6 +217,9 @@ impl TypeChecker {
         let final_ty = self.subst.apply(&fun_ty);
         let scheme = self.env.generalize(&final_ty);
         self.env.insert(decl.name.value.clone(), scheme);
+
+        // Verify constraints on concrete types within the function
+        self.verify_constraints(decl.name.span)?;
 
         Ok(())
     }
@@ -311,12 +356,49 @@ impl TypeChecker {
     }
 
     fn infer_var(&mut self, name: &str, span: Span) -> Result<Type, TypeError> {
-        match self.env.lookup(name) {
-            Some(scheme) => Ok(scheme.instantiate()),
-            None => Err(TypeError::UnboundVariable {
-                name: name.to_string(),
-                span,
-            }),
+        // First check if it's a regular variable
+        if let Some(scheme) = self.env.lookup(name) {
+            return Ok(scheme.instantiate());
+        }
+
+        // Check if it's a trait method
+        if let Some((class_name, method_scheme)) = self.find_trait_method(name) {
+            // Instantiate the method type with a fresh type variable
+            let method_ty = method_scheme.instantiate();
+
+            // Add a constraint that the first argument type must implement the trait
+            // For a method like `show: 'a -> string`, we add constraint `Show 'a`
+            if let Some(arg_ty) = self.get_first_arg_type(&method_ty) {
+                self.constraints.push(Constraint::new(class_name, arg_ty));
+            }
+
+            return Ok(method_ty);
+        }
+
+        Err(TypeError::UnboundVariable {
+            name: name.to_string(),
+            span,
+        })
+    }
+
+    /// Find a trait method by name, returning the class name and method type.
+    fn find_trait_method(&self, method_name: &str) -> Option<(String, TypeScheme)> {
+        // Search all type classes for the method
+        for (class_name, class) in self.env.type_classes_iter() {
+            for (name, scheme) in &class.methods {
+                if name == method_name {
+                    return Some((class_name.clone(), scheme.clone()));
+                }
+            }
+        }
+        None
+    }
+
+    /// Extract the first argument type from a function type.
+    fn get_first_arg_type(&self, ty: &Type) -> Option<Type> {
+        match ty {
+            Type::Arrow(arg, _) => Some((**arg).clone()),
+            _ => None,
         }
     }
 
@@ -1343,5 +1425,61 @@ mod tests {
         "#,
         );
         assert!(result.is_ok());
+    }
+
+    // ========== Type Class Tests ==========
+
+    #[test]
+    fn infer_show_int() {
+        // show 5 should type check and return string
+        let ty = infer("show 5").unwrap();
+        assert_eq!(ty, Type::string());
+    }
+
+    #[test]
+    fn infer_show_float() {
+        // show 3.14 should type check and return string
+        let ty = infer("show 3.14").unwrap();
+        assert_eq!(ty, Type::string());
+    }
+
+    #[test]
+    fn infer_show_bool() {
+        // show true should type check and return string
+        let ty = infer("show true").unwrap();
+        assert_eq!(ty, Type::string());
+    }
+
+    #[test]
+    fn infer_show_string() {
+        // show "hello" should type check and return string
+        let ty = infer("show \"hello\"").unwrap();
+        assert_eq!(ty, Type::string());
+    }
+
+    #[test]
+    fn check_show_in_val() {
+        // Using show in a val binding
+        let result = check("val s = show 42");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_show_in_fun() {
+        // Using show in a function
+        let result = check(
+            r#"
+            fun showTwice x = show x ^ " " ^ show x
+            val result = showTwice 5
+        "#,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_eq_int() {
+        // eq 1 2 should type check and return bool
+        let ty = infer("eq 1 2").unwrap();
+        assert_eq!(ty, Type::bool());
     }
 }

@@ -3,8 +3,8 @@
 //! Implements Algorithm W for Hindley-Milner type inference.
 
 use crate::syntax::{
-    BinOp, Decl, DatatypeDecl, Expr, FunDecl, Literal, MatchArm, Pattern, Program, Span, Spanned,
-    TypeDecl, TypeExpr, UnOp, ValDecl,
+    BinOp, Decl, DatatypeDecl, Expr, FunDecl, ImplDecl, Literal, MatchArm, Pattern, Program, Span,
+    Spanned, TraitDecl, TypeDecl, TypeExpr, UnOp, ValDecl,
 };
 
 use super::env::TypeEnv;
@@ -79,6 +79,8 @@ impl TypeChecker {
             Decl::Fun(fun) => self.check_fun_decl(fun, decl.span),
             Decl::Type(ty) => self.check_type_decl(ty),
             Decl::Datatype(dt) => self.check_datatype_decl(dt),
+            Decl::Trait(tr) => self.check_trait_decl(tr),
+            Decl::Impl(im) => self.check_impl_decl(im),
         }
     }
 
@@ -211,6 +213,21 @@ impl TypeChecker {
             self.env.insert_constructor(con.name.value.clone(), scheme);
         }
 
+        Ok(())
+    }
+
+    fn check_trait_decl(&mut self, _decl: &TraitDecl) -> Result<(), TypeError> {
+        // TODO: Implement trait declaration checking
+        // - Register the trait in the environment
+        // - Store method signatures
+        Ok(())
+    }
+
+    fn check_impl_decl(&mut self, _decl: &ImplDecl) -> Result<(), TypeError> {
+        // TODO: Implement impl declaration checking
+        // - Look up the trait
+        // - Verify the type matches
+        // - Check method implementations match signatures
         Ok(())
     }
 

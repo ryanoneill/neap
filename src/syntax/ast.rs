@@ -26,6 +26,12 @@ pub enum Decl {
 
     /// Datatype definition: `datatype 'a t = C1 | C2 of ty`
     Datatype(DatatypeDecl),
+
+    /// Trait definition: `trait Show { fn show(self) -> string }`
+    Trait(TraitDecl),
+
+    /// Trait implementation: `impl Show for int { fn show(self) = ... }`
+    Impl(ImplDecl),
 }
 
 /// A value declaration.
@@ -90,6 +96,60 @@ pub struct Constructor {
     pub name: Spanned<String>,
     /// Optional argument type
     pub arg: Option<Spanned<TypeExpr>>,
+}
+
+/// A trait declaration.
+///
+/// Example: `trait Show { fn show(self) -> string }`
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitDecl {
+    /// The trait name (e.g., "Show")
+    pub name: Spanned<String>,
+    /// The type parameter name (typically "self" but could be any name)
+    pub type_param: Spanned<String>,
+    /// The method signatures
+    pub methods: Vec<MethodSig>,
+}
+
+/// A method signature in a trait declaration.
+///
+/// Example: `fn show(self) -> string`
+#[derive(Debug, Clone, PartialEq)]
+pub struct MethodSig {
+    /// The method name
+    pub name: Spanned<String>,
+    /// Parameter names (first is typically "self")
+    pub params: Vec<Spanned<String>>,
+    /// The return type
+    pub return_ty: Spanned<TypeExpr>,
+}
+
+/// A trait implementation declaration.
+///
+/// Example: `impl Show for int { fn show(self) = intToString self }`
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImplDecl {
+    /// The trait being implemented
+    pub trait_name: Spanned<String>,
+    /// The type the trait is being implemented for
+    pub for_type: Spanned<TypeExpr>,
+    /// The method implementations
+    pub methods: Vec<MethodImpl>,
+}
+
+/// A method implementation in an impl block.
+///
+/// Example: `fn show(self) = intToString self`
+#[derive(Debug, Clone, PartialEq)]
+pub struct MethodImpl {
+    /// The method name
+    pub name: Spanned<String>,
+    /// Parameter names
+    pub params: Vec<Spanned<String>>,
+    /// Optional return type annotation
+    pub return_ty: Option<Spanned<TypeExpr>>,
+    /// The method body
+    pub body: Spanned<Expr>,
 }
 
 /// A part of a shell command (for interpolation support).

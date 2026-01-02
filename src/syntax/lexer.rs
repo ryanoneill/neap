@@ -803,6 +803,20 @@ mod tests {
         );
     }
 
+    #[test]
+    fn type_class_keywords() {
+        let tokens = token_kinds("trait impl for").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                TokenKind::Trait,
+                TokenKind::Impl,
+                TokenKind::For,
+                TokenKind::Eof,
+            ]
+        );
+    }
+
     // ========== Identifiers ==========
 
     #[test]

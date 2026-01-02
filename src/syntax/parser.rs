@@ -96,10 +96,13 @@ impl Parser {
             Some(TokenKind::Fun) => self.parse_fun_decl(),
             Some(TokenKind::Type) => self.parse_type_decl(),
             Some(TokenKind::Datatype) => self.parse_datatype_decl(),
+            Some(TokenKind::Trait) => self.parse_trait_decl(),
+            Some(TokenKind::Impl) => self.parse_impl_decl(),
             Some(_) => {
                 let token = self.peek().unwrap();
                 Err(ParseError::UnexpectedToken {
-                    expected: "declaration (val, let, fun, type, or datatype)".to_string(),
+                    expected: "declaration (val, let, fun, type, datatype, trait, or impl)"
+                        .to_string(),
                     found: token.kind.name().to_string(),
                     span: token.span,
                 })
@@ -292,6 +295,141 @@ impl Parser {
         };
 
         Ok(Constructor { name, arg })
+    }
+
+    /// Parse a trait declaration.
+    ///
+    /// Syntax: `trait Name { fn method(self) -> Type ... }`
+    fn parse_trait_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
+        let start = self.expect(TokenKind::Trait)?.span;
+        let name = self.expect_upper_ident()?;
+
+        self.expect(TokenKind::LBrace)?;
+
+        let mut methods = Vec::new();
+
+        // Parse method signatures until we hit }
+        while !matches!(self.peek_kind(), Some(TokenKind::RBrace)) && !self.is_at_end() {
+            methods.push(self.parse_method_sig()?);
+        }
+
+        let end = self.expect(TokenKind::RBrace)?.span;
+        let span = start.merge(end);
+
+        // The type parameter is implicit "self" for now
+        let type_param = Spanned::new("self".to_string(), name.span);
+
+        Ok(Spanned::new(
+            Decl::Trait(TraitDecl {
+                name,
+                type_param,
+                methods,
+            }),
+            span,
+        ))
+    }
+
+    /// Parse a method signature in a trait.
+    ///
+    /// Syntax: `fn name(param1, param2, ...) -> ReturnType`
+    fn parse_method_sig(&mut self) -> Result<MethodSig, ParseError> {
+        self.expect(TokenKind::Fn)?;
+        let name = self.expect_ident()?;
+
+        self.expect(TokenKind::LParen)?;
+
+        let mut params = Vec::new();
+
+        // Parse parameters (comma-separated identifiers)
+        if !matches!(self.peek_kind(), Some(TokenKind::RParen)) {
+            params.push(self.expect_ident()?);
+            while self.eat(TokenKind::Comma) {
+                params.push(self.expect_ident()?);
+            }
+        }
+
+        self.expect(TokenKind::RParen)?;
+        self.expect(TokenKind::Arrow)?;
+
+        let return_ty = self.parse_type()?;
+
+        Ok(MethodSig {
+            name,
+            params,
+            return_ty,
+        })
+    }
+
+    /// Parse an impl declaration.
+    ///
+    /// Syntax: `impl TraitName for Type { fn method(param) = expr ... }`
+    fn parse_impl_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
+        let start = self.expect(TokenKind::Impl)?.span;
+        let trait_name = self.expect_upper_ident()?;
+
+        self.expect(TokenKind::For)?;
+        let for_type = self.parse_type()?;
+
+        self.expect(TokenKind::LBrace)?;
+
+        let mut methods = Vec::new();
+
+        // Parse method implementations until we hit }
+        while !matches!(self.peek_kind(), Some(TokenKind::RBrace)) && !self.is_at_end() {
+            methods.push(self.parse_method_impl()?);
+        }
+
+        let end = self.expect(TokenKind::RBrace)?.span;
+        let span = start.merge(end);
+
+        Ok(Spanned::new(
+            Decl::Impl(ImplDecl {
+                trait_name,
+                for_type,
+                methods,
+            }),
+            span,
+        ))
+    }
+
+    /// Parse a method implementation in an impl block.
+    ///
+    /// Syntax: `fn name(param1, param2, ...) = expr`
+    /// or: `fn name(param1, param2, ...) -> ReturnType = expr`
+    fn parse_method_impl(&mut self) -> Result<MethodImpl, ParseError> {
+        self.expect(TokenKind::Fn)?;
+        let name = self.expect_ident()?;
+
+        self.expect(TokenKind::LParen)?;
+
+        let mut params = Vec::new();
+
+        // Parse parameters (comma-separated identifiers)
+        if !matches!(self.peek_kind(), Some(TokenKind::RParen)) {
+            params.push(self.expect_ident()?);
+            while self.eat(TokenKind::Comma) {
+                params.push(self.expect_ident()?);
+            }
+        }
+
+        self.expect(TokenKind::RParen)?;
+
+        // Optional return type annotation
+        let return_ty = if self.eat(TokenKind::Arrow) {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+
+        self.expect(TokenKind::Eq)?;
+        let body = self.parse_expr()?;
+
+        Ok(MethodImpl {
+            name,
+            params,
+            return_ty,
+            body,
+        })
     }
 
     // ========== Expression Parsing (Pratt Parser) ==========
@@ -2059,6 +2197,106 @@ mod tests {
         } else {
             panic!("Expected Datatype");
         }
+    }
+
+    #[test]
+    fn parse_trait_decl() {
+        let source = r#"
+            trait Show {
+                fn show(self) -> string
+            }
+        "#;
+        let program = parse_program(source).unwrap();
+        assert_eq!(program.decls.len(), 1);
+        if let Decl::Trait(tr) = &program.decls[0].value {
+            assert_eq!(tr.name.value, "Show");
+            assert_eq!(tr.methods.len(), 1);
+            assert_eq!(tr.methods[0].name.value, "show");
+            assert_eq!(tr.methods[0].params.len(), 1);
+            assert_eq!(tr.methods[0].params[0].value, "self");
+        } else {
+            panic!("Expected Trait");
+        }
+    }
+
+    #[test]
+    fn parse_trait_multiple_methods() {
+        let source = r#"
+            trait Eq {
+                fn eq(self, other) -> bool
+                fn neq(self, other) -> bool
+            }
+        "#;
+        let program = parse_program(source).unwrap();
+        assert_eq!(program.decls.len(), 1);
+        if let Decl::Trait(tr) = &program.decls[0].value {
+            assert_eq!(tr.name.value, "Eq");
+            assert_eq!(tr.methods.len(), 2);
+            assert_eq!(tr.methods[0].name.value, "eq");
+            assert_eq!(tr.methods[1].name.value, "neq");
+        } else {
+            panic!("Expected Trait");
+        }
+    }
+
+    #[test]
+    fn parse_impl_decl() {
+        let source = r#"
+            impl Show for int {
+                fn show(self) = intToString self
+            }
+        "#;
+        let program = parse_program(source).unwrap();
+        assert_eq!(program.decls.len(), 1);
+        if let Decl::Impl(im) = &program.decls[0].value {
+            assert_eq!(im.trait_name.value, "Show");
+            if let TypeExpr::Con(ty_name) = &im.for_type.value {
+                assert_eq!(ty_name, "int");
+            } else {
+                panic!("Expected type constructor");
+            }
+            assert_eq!(im.methods.len(), 1);
+            assert_eq!(im.methods[0].name.value, "show");
+        } else {
+            panic!("Expected Impl");
+        }
+    }
+
+    #[test]
+    fn parse_impl_with_return_type() {
+        let source = r#"
+            impl Show for float {
+                fn show(self) -> string = floatToString self
+            }
+        "#;
+        let program = parse_program(source).unwrap();
+        assert_eq!(program.decls.len(), 1);
+        if let Decl::Impl(im) = &program.decls[0].value {
+            assert_eq!(im.trait_name.value, "Show");
+            assert!(im.methods[0].return_ty.is_some());
+        } else {
+            panic!("Expected Impl");
+        }
+    }
+
+    #[test]
+    fn parse_trait_and_impl() {
+        let source = r#"
+            trait Show {
+                fn show(self) -> string
+            }
+            impl Show for int {
+                fn show(self) = intToString self
+            }
+            impl Show for bool {
+                fn show(self) = if self then "true" else "false"
+            }
+        "#;
+        let program = parse_program(source).unwrap();
+        assert_eq!(program.decls.len(), 3);
+        assert!(matches!(program.decls[0].value, Decl::Trait(_)));
+        assert!(matches!(program.decls[1].value, Decl::Impl(_)));
+        assert!(matches!(program.decls[2].value, Decl::Impl(_)));
     }
 
     #[test]

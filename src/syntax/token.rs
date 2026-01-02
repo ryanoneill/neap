@@ -67,6 +67,14 @@ pub enum TokenKind {
     /// `false` - boolean literal
     False,
 
+    // ========== Type Classes ==========
+    /// `trait` - trait definition
+    Trait,
+    /// `impl` - trait implementation
+    Impl,
+    /// `for` - used in `impl Trait for Type`
+    For,
+
     // ========== Shell Sugar ==========
     /// `|>` - pipe operator
     Pipe,
@@ -202,6 +210,9 @@ impl TokenKind {
                 | Self::End
                 | Self::True
                 | Self::False
+                | Self::Trait
+                | Self::Impl
+                | Self::For
         )
     }
 
@@ -295,6 +306,9 @@ impl TokenKind {
             "andalso" => Some(Self::AndAlso),
             "orelse" => Some(Self::OrElse),
             "not" => Some(Self::Bang),
+            "trait" => Some(Self::Trait),
+            "impl" => Some(Self::Impl),
+            "for" => Some(Self::For),
             _ => None,
         }
     }
@@ -323,6 +337,9 @@ impl TokenKind {
             Self::End => "end",
             Self::True => "true",
             Self::False => "false",
+            Self::Trait => "trait",
+            Self::Impl => "impl",
+            Self::For => "for",
             Self::Pipe => "|>",
             Self::Gt => ">",
             Self::GtGt => ">>",

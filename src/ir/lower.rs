@@ -273,6 +273,16 @@ impl Lower {
                     constructors,
                 }))
             }
+            Decl::Trait(_) => {
+                // TODO: Implement trait lowering
+                // - Store trait info for later dictionary generation
+                Ok(None)
+            }
+            Decl::Impl(_) => {
+                // TODO: Implement impl lowering
+                // - Generate dictionary construction
+                Ok(None)
+            }
         }
     }
 

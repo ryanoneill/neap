@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::subst::Substitution;
-use super::core::{Type, TypeScheme, TypeVar};
+use super::core::{ClassInstance, Type, TypeClass, TypeScheme, TypeVar};
 
 /// A type environment mapping identifiers to type schemes.
 #[derive(Debug, Clone, Default)]
@@ -19,6 +19,12 @@ pub struct TypeEnv {
 
     /// Data constructor types (constructor name -> type scheme)
     constructors: HashMap<String, TypeScheme>,
+
+    /// Type class definitions (class name -> definition)
+    type_classes: HashMap<String, TypeClass>,
+
+    /// Type class instances
+    instances: Vec<ClassInstance>,
 }
 
 impl TypeEnv {
@@ -29,6 +35,8 @@ impl TypeEnv {
             bindings: HashMap::new(),
             type_arities: HashMap::new(),
             constructors: HashMap::new(),
+            type_classes: HashMap::new(),
+            instances: Vec::new(),
         }
     }
 
@@ -378,6 +386,86 @@ impl TypeEnv {
     /// Insert a data constructor.
     pub fn insert_constructor(&mut self, name: String, scheme: TypeScheme) {
         self.constructors.insert(name, scheme);
+    }
+
+    // ========== Type Class Operations ==========
+
+    /// Register a type class.
+    pub fn insert_class(&mut self, class: TypeClass) {
+        self.type_classes.insert(class.name.clone(), class);
+    }
+
+    /// Look up a type class by name.
+    #[must_use]
+    pub fn lookup_class(&self, name: &str) -> Option<&TypeClass> {
+        self.type_classes.get(name)
+    }
+
+    /// Check if a type class exists.
+    #[must_use]
+    pub fn has_class(&self, name: &str) -> bool {
+        self.type_classes.contains_key(name)
+    }
+
+    /// Register a class instance.
+    pub fn insert_instance(&mut self, instance: ClassInstance) {
+        self.instances.push(instance);
+    }
+
+    /// Find an instance of a type class for a specific type.
+    ///
+    /// Returns the instance if found, or None if no matching instance exists.
+    #[must_use]
+    pub fn find_instance(&self, class_name: &str, ty: &Type) -> Option<&ClassInstance> {
+        self.instances
+            .iter()
+            .find(|i| i.class_name == class_name && self.types_match(&i.for_type, ty))
+    }
+
+    /// Check if two types match (simple equality for now).
+    ///
+    /// In a more complete implementation, this would handle type variable
+    /// matching and more sophisticated unification.
+    fn types_match(&self, instance_ty: &Type, query_ty: &Type) -> bool {
+        // For simple types, use equality
+        // This is a simplified implementation; a full implementation would
+        // need to handle polymorphic instances (e.g., Show for list 'a)
+        match (instance_ty, query_ty) {
+            (Type::Con(name1, args1), Type::Con(name2, args2)) => {
+                name1 == name2
+                    && args1.len() == args2.len()
+                    && args1
+                        .iter()
+                        .zip(args2.iter())
+                        .all(|(a, b)| self.types_match(a, b))
+            }
+            (Type::Var(_), _) => {
+                // Instance type variables match anything
+                true
+            }
+            _ => instance_ty == query_ty,
+        }
+    }
+
+    /// Get all instances for a given type class.
+    #[must_use]
+    pub fn instances_for_class(&self, class_name: &str) -> Vec<&ClassInstance> {
+        self.instances
+            .iter()
+            .filter(|i| i.class_name == class_name)
+            .collect()
+    }
+
+    /// Look up a method in a type class.
+    #[must_use]
+    pub fn lookup_method(&self, class_name: &str, method_name: &str) -> Option<&TypeScheme> {
+        self.type_classes.get(class_name).and_then(|class| {
+            class
+                .methods
+                .iter()
+                .find(|(name, _)| name == method_name)
+                .map(|(_, scheme)| scheme)
+        })
     }
 
     // ========== Type Scheme Operations ==========

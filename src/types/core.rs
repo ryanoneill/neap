@@ -46,6 +46,124 @@ impl fmt::Display for TypeVar {
     }
 }
 
+/// A type class constraint.
+///
+/// Represents a requirement that a type must implement a particular type class.
+/// e.g., `Show 'a` means type variable 'a must implement Show.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Constraint {
+    /// The name of the type class (e.g., "Show", "Eq")
+    pub class_name: String,
+    /// The type that must satisfy the constraint
+    pub ty: Type,
+}
+
+impl Constraint {
+    /// Create a new constraint.
+    #[must_use]
+    pub fn new(class_name: impl Into<String>, ty: Type) -> Self {
+        Self {
+            class_name: class_name.into(),
+            ty,
+        }
+    }
+
+    /// Get the free type variables in this constraint.
+    #[must_use]
+    pub fn free_vars(&self) -> HashSet<TypeVar> {
+        self.ty.free_vars()
+    }
+}
+
+impl fmt::Display for Constraint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.class_name, self.ty)
+    }
+}
+
+/// A type class definition.
+///
+/// Represents a trait with its methods.
+/// e.g., `trait Show { fn show(self) -> string }`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeClass {
+    /// The name of the type class (e.g., "Show")
+    pub name: String,
+    /// Method signatures: (method_name, type_scheme)
+    /// The type scheme includes the class's type parameter
+    pub methods: Vec<(String, TypeScheme)>,
+}
+
+impl TypeClass {
+    /// Create a new type class.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            methods: Vec::new(),
+        }
+    }
+
+    /// Add a method to the type class.
+    pub fn add_method(&mut self, name: impl Into<String>, ty: TypeScheme) {
+        self.methods.push((name.into(), ty));
+    }
+
+    /// Create a type class with methods.
+    #[must_use]
+    pub fn with_methods(name: impl Into<String>, methods: Vec<(String, TypeScheme)>) -> Self {
+        Self {
+            name: name.into(),
+            methods,
+        }
+    }
+}
+
+/// An instance of a type class for a specific type.
+///
+/// e.g., `impl Show for int { fn show(self) = intToString self }`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassInstance {
+    /// The name of the type class
+    pub class_name: String,
+    /// The type this instance is for (e.g., `int`, `list 'a`)
+    pub for_type: Type,
+    /// Method implementations: (method_name, implementation_name)
+    /// The implementation_name refers to a function in the environment
+    pub methods: Vec<(String, String)>,
+}
+
+impl ClassInstance {
+    /// Create a new class instance.
+    #[must_use]
+    pub fn new(class_name: impl Into<String>, for_type: Type) -> Self {
+        Self {
+            class_name: class_name.into(),
+            for_type,
+            methods: Vec::new(),
+        }
+    }
+
+    /// Add a method implementation.
+    pub fn add_method(&mut self, name: impl Into<String>, impl_name: impl Into<String>) {
+        self.methods.push((name.into(), impl_name.into()));
+    }
+
+    /// Create an instance with methods.
+    #[must_use]
+    pub fn with_methods(
+        class_name: impl Into<String>,
+        for_type: Type,
+        methods: Vec<(String, String)>,
+    ) -> Self {
+        Self {
+            class_name: class_name.into(),
+            for_type,
+            methods,
+        }
+    }
+}
+
 /// A monomorphic type (no quantifiers).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
@@ -312,27 +430,49 @@ impl fmt::Display for Type {
 
 /// A type scheme (polymorphic type).
 ///
-/// A type scheme is a type with universally quantified type variables.
+/// A type scheme is a type with universally quantified type variables
+/// and optional type class constraints.
 /// e.g., `forall 'a. 'a -> 'a` (the identity function)
+/// e.g., `forall 'a. Show 'a => 'a -> string` (constrained polymorphism)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeScheme {
     /// The quantified type variables
     pub vars: Vec<TypeVar>,
+    /// Type class constraints on the quantified variables
+    pub constraints: Vec<Constraint>,
     /// The body type
     pub ty: Type,
 }
 
 impl TypeScheme {
-    /// Create a monomorphic type scheme (no quantification).
+    /// Create a monomorphic type scheme (no quantification, no constraints).
     #[must_use]
     pub fn mono(ty: Type) -> Self {
-        Self { vars: vec![], ty }
+        Self {
+            vars: vec![],
+            constraints: vec![],
+            ty,
+        }
     }
 
-    /// Create a polymorphic type scheme.
+    /// Create a polymorphic type scheme (no constraints).
     #[must_use]
     pub fn poly(vars: Vec<TypeVar>, ty: Type) -> Self {
-        Self { vars, ty }
+        Self {
+            vars,
+            constraints: vec![],
+            ty,
+        }
+    }
+
+    /// Create a constrained polymorphic type scheme.
+    #[must_use]
+    pub fn constrained(vars: Vec<TypeVar>, constraints: Vec<Constraint>, ty: Type) -> Self {
+        Self {
+            vars,
+            constraints,
+            ty,
+        }
     }
 
     /// Instantiate this type scheme with fresh type variables.
@@ -366,14 +506,27 @@ impl TypeScheme {
 
 impl fmt::Display for TypeScheme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.vars.is_empty() {
+        if self.vars.is_empty() && self.constraints.is_empty() {
             write!(f, "{}", self.ty)
         } else {
-            write!(f, "forall")?;
-            for var in &self.vars {
-                write!(f, " {var}")?;
+            if !self.vars.is_empty() {
+                write!(f, "forall")?;
+                for var in &self.vars {
+                    write!(f, " {var}")?;
+                }
+                write!(f, ".")?;
             }
-            write!(f, ". {}", self.ty)
+            if !self.constraints.is_empty() {
+                write!(f, " ")?;
+                for (i, constraint) in self.constraints.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{constraint}")?;
+                }
+                write!(f, " =>")?;
+            }
+            write!(f, " {}", self.ty)
         }
     }
 }

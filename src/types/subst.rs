@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use super::core::{Type, TypeScheme, TypeVar};
+use super::core::{Constraint, Type, TypeScheme, TypeVar};
 
 /// A substitution mapping type variables to types.
 #[derive(Debug, Clone, Default)]
@@ -99,8 +99,16 @@ impl Substitution {
             filtered.map.remove(var);
         }
 
+        // Apply substitution to constraints
+        let constraints = scheme
+            .constraints
+            .iter()
+            .map(|c| Constraint::new(c.class_name.clone(), filtered.apply(&c.ty)))
+            .collect();
+
         TypeScheme {
             vars: scheme.vars.clone(),
+            constraints,
             ty: filtered.apply(&scheme.ty),
         }
     }

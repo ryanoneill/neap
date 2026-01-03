@@ -26,6 +26,9 @@ pretty_assertions = "1.4"
 # Temp files for shell integration tests
 tempfile = "3.14"
 
+# Async runtime for REPL tests
+tokio = { version = "1", features = ["rt", "macros"] }
+
 [[bin]]
 name = "neap"
 path = "src/main.rs"

@@ -57,13 +57,28 @@ impl<W: Write, R: BufRead> VM<W, R> {
         self.globals.get(name)
     }
 
+    /// Clear all global variables.
+    pub fn clear_globals(&mut self) {
+        self.globals.clear();
+    }
+
+    /// Get a reference to stdout.
+    pub fn stdout(&self) -> &W {
+        &self.stdout
+    }
+
     /// Get a mutable reference to stdout.
-    pub fn stdout(&mut self) -> &mut W {
+    pub fn stdout_mut(&mut self) -> &mut W {
         &mut self.stdout
     }
 
+    /// Get a reference to stdin.
+    pub fn stdin(&self) -> &R {
+        &self.stdin
+    }
+
     /// Get a mutable reference to stdin.
-    pub fn stdin(&mut self) -> &mut R {
+    pub fn stdin_mut(&mut self) -> &mut R {
         &mut self.stdin
     }
 

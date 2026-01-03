@@ -87,9 +87,9 @@ impl Lower {
 
     /// Get the type of an expression using local bindings.
     ///
-    /// This avoids calling the type checker's infer_expr which doesn't
-    /// have our local variable bindings in scope.
-    fn expr_type(&self, expr: &Spanned<Expr>) -> Result<Type, LowerError> {
+    /// For simple expressions, computes the type directly.
+    /// For complex expressions like pipes, falls back to the type checker.
+    fn expr_type(&mut self, expr: &Spanned<Expr>) -> Result<Type, LowerError> {
         match &expr.value {
             Expr::Lit(lit) => Ok(match lit {
                 Literal::Int(_) => Type::int(),
@@ -199,11 +199,11 @@ impl Lower {
                         return Ok(Type::command_result());
                     }
                 }
-                // For function application, we'd need to decompose the arrow type
-                // This is complex, so fall through to error for now
-                Err(LowerError::Internal(
-                    "cannot determine pipe expression type".to_string(),
-                ))
+                // For function pipes (lhs |> rhs = rhs(lhs)), use the type checker
+                // to infer the full type
+                self.checker
+                    .infer_expr(expr)
+                    .map_err(|e| LowerError::TypeError(vec![e]))
             }
 
             // For complex expressions, we need more context
@@ -590,15 +590,9 @@ impl Lower {
         let ir_func = self.lower_expr(func, &func_ty)?;
         let ir_arg = self.lower_expr(arg, &arg_ty)?;
 
-        // In ANF, we need to ensure both are values
-        // If not, we bind them to temporary variables
-        let (ir_func, ir_arg) = self.ensure_anf_app(ir_func, ir_arg, result_ty)?;
-
-        Ok(IRExpr::App {
-            func: Box::new(ir_func),
-            arg: Box::new(ir_arg),
-            result_ty: result_ty.clone(),
-        })
+        // In ANF, we need to ensure both func and arg are values
+        // If not, we bind them to temporary variables using Let
+        self.ensure_anf_app(ir_func, ir_arg, result_ty)
     }
 
     /// Resolve a trait method call to its implementation function.
@@ -606,7 +600,7 @@ impl Lower {
     /// Returns the implementation function name if this is a trait method call,
     /// or None if it's not a trait method.
     fn resolve_trait_method(
-        &self,
+        &mut self,
         method_name: &str,
         arg: &Spanned<Expr>,
     ) -> Result<Option<String>, LowerError> {
@@ -757,24 +751,31 @@ impl Lower {
         })
     }
 
-    /// Ensure application is in ANF form.
+    /// Ensure application is in ANF form by wrapping non-value expressions in Let bindings.
+    ///
+    /// Returns a complete expression that evaluates both func and arg, binds non-values
+    /// to temporaries, and then applies the function.
     fn ensure_anf_app(
         &mut self,
         func: IRExpr,
         arg: IRExpr,
         result_ty: &Type,
-    ) -> Result<(IRExpr, IRExpr), LowerError> {
-        // If both are values, we're done
+    ) -> Result<IRExpr, LowerError> {
+        // If both are values, create direct App
         if func.is_value() && arg.is_value() {
-            return Ok((func, arg));
+            return Ok(IRExpr::App {
+                func: Box::new(func),
+                arg: Box::new(arg),
+                result_ty: result_ty.clone(),
+            });
         }
 
-        // Need to bind non-values to temporaries
         let func_ty = func.ty();
         let arg_ty = arg.ty();
 
         if !func.is_value() && !arg.is_value() {
-            // Both need binding - create nested lets
+            // Both need binding - create nested lets:
+            // let func_var = func in let arg_var = arg in func_var arg_var
             let func_var = VarId::fresh();
             let arg_var = VarId::fresh();
 
@@ -791,25 +792,48 @@ impl Lower {
                 body: Box::new(inner_app),
             };
 
-            Ok((func, with_arg))
+            let with_func = IRExpr::Let {
+                var: func_var,
+                ty: func_ty,
+                value: Box::new(func),
+                body: Box::new(with_arg),
+            };
+
+            Ok(with_func)
         } else if !func.is_value() {
-            // Only func needs binding
+            // Only func needs binding:
+            // let func_var = func in func_var arg
             let func_var = VarId::fresh();
-            let app = IRExpr::App {
+
+            let inner_app = IRExpr::App {
                 func: Box::new(IRExpr::Var(func_var, func_ty.clone())),
                 arg: Box::new(arg),
                 result_ty: result_ty.clone(),
             };
-            Ok((func, app))
+
+            Ok(IRExpr::Let {
+                var: func_var,
+                ty: func_ty,
+                value: Box::new(func),
+                body: Box::new(inner_app),
+            })
         } else {
-            // Only arg needs binding
+            // Only arg needs binding:
+            // let arg_var = arg in func arg_var
             let arg_var = VarId::fresh();
-            let app = IRExpr::App {
+
+            let inner_app = IRExpr::App {
                 func: Box::new(func),
                 arg: Box::new(IRExpr::Var(arg_var, arg_ty.clone())),
                 result_ty: result_ty.clone(),
             };
-            Ok((arg, app))
+
+            Ok(IRExpr::Let {
+                var: arg_var,
+                ty: arg_ty,
+                value: Box::new(arg),
+                body: Box::new(inner_app),
+            })
         }
     }
 

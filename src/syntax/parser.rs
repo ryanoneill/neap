@@ -87,6 +87,11 @@ impl Parser {
         self.parse_type_expr()
     }
 
+    /// Check if the parser has consumed all input.
+    pub fn is_at_end(&self) -> bool {
+        matches!(self.peek_kind(), None | Some(TokenKind::Eof))
+    }
+
     // ========== Declaration Parsing ==========
 
     /// Parse a single declaration.
@@ -1435,10 +1440,6 @@ impl Parser {
         let token = self.tokens[self.pos].clone();
         self.pos += 1;
         token
-    }
-
-    fn is_at_end(&self) -> bool {
-        matches!(self.peek_kind(), None | Some(TokenKind::Eof))
     }
 
     fn eat(&mut self, kind: TokenKind) -> bool {

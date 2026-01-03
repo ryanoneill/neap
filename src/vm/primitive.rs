@@ -258,7 +258,7 @@ pub fn eval_primitive<W: Write, R: BufRead>(
             let s = args[0]
                 .as_string()
                 .ok_or_else(|| type_error("string", &args[0]))?;
-            writeln!(vm.stdout(), "{s}")?;
+            writeln!(vm.stdout_mut(), "{s}")?;
             Ok(Value::Unit)
         }
 
@@ -267,15 +267,15 @@ pub fn eval_primitive<W: Write, R: BufRead>(
             let s = args[0]
                 .as_string()
                 .ok_or_else(|| type_error("string", &args[0]))?;
-            write!(vm.stdout(), "{s}")?;
-            vm.stdout().flush()?;
+            write!(vm.stdout_mut(), "{s}")?;
+            vm.stdout_mut().flush()?;
             Ok(Value::Unit)
         }
 
         Primitive::ReadLine => {
             expect_args(0, args)?;
             let mut line = String::new();
-            vm.stdin().read_line(&mut line)?;
+            vm.stdin_mut().read_line(&mut line)?;
             // Remove trailing newline
             if line.ends_with('\n') {
                 line.pop();

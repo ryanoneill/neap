@@ -102,9 +102,11 @@ pub enum TokenKind {
     Slash,
     /// `%` - modulo
     Percent,
-    /// `=` - equality / binding
+    /// `=` - binding / assignment
     Eq,
-    /// `<>` - not equal
+    /// `==` - equality comparison
+    EqEq,
+    /// `<>` or `!=` - not equal
     Neq,
     /// `<=` - less than or equal
     Le,
@@ -235,6 +237,7 @@ impl TokenKind {
                 | Self::Slash
                 | Self::Percent
                 | Self::Eq
+                | Self::EqEq
                 | Self::Neq
                 | Self::Lt
                 | Self::Le
@@ -351,7 +354,8 @@ impl TokenKind {
             Self::Slash => "/",
             Self::Percent => "%",
             Self::Eq => "=",
-            Self::Neq => "<>",
+            Self::EqEq => "==",
+            Self::Neq => "!=",
             Self::Le => "<=",
             Self::Ge => ">=",
             Self::Caret => "^",

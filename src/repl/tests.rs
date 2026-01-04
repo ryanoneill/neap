@@ -50,7 +50,7 @@ async fn test_function_definition() {
 #[tokio::test]
 async fn test_recursive_function() {
     let mut repl = ReplTestHarness::new();
-    repl.input("fun fact n = if n = 0 then 1 else n * fact (n - 1)")
+    repl.input("fun fact n = if n == 0 then 1 else n * fact (n - 1)")
         .await;
 
     let r = repl.input("fact 5").await;
@@ -61,7 +61,7 @@ async fn test_recursive_function() {
 async fn test_recursive_function_type() {
     let mut repl = ReplTestHarness::new();
     let r = repl
-        .input("fun fact n = if n = 0 then 1 else n * fact (n - 1)")
+        .input("fun fact n = if n == 0 then 1 else n * fact (n - 1)")
         .await;
 
     // The type should be int -> int, not int -> 'tN
@@ -158,7 +158,7 @@ async fn test_comparison() {
     let r = repl.input("5 < 3").await;
     assert_eq!(r.value_str(), Some("false"));
 
-    let r = repl.input("5 = 5").await;
+    let r = repl.input("5 == 5").await;
     assert_eq!(r.value_str(), Some("true"));
 }
 

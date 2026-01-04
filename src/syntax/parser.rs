@@ -906,7 +906,7 @@ impl Parser {
                     span,
                 ))
             }
-            TokenKind::Eq => {
+            TokenKind::EqEq => {
                 let rhs = self.parse_expr_bp(r_bp)?;
                 let span = lhs.span.merge(rhs.span);
                 Ok(Spanned::new(
@@ -1517,7 +1517,7 @@ fn infix_binding_power(op: &TokenKind) -> Option<(u8, u8)> {
         TokenKind::AndAlso => (5, 6),
 
         // Comparison
-        TokenKind::Eq | TokenKind::Neq | TokenKind::Lt | TokenKind::Le | TokenKind::Gt | TokenKind::Ge => (7, 8),
+        TokenKind::EqEq | TokenKind::Neq | TokenKind::Lt | TokenKind::Le | TokenKind::Gt | TokenKind::Ge => (7, 8),
 
         // Cons (right-associative)
         TokenKind::ColonColon => (10, 9),
@@ -1733,8 +1733,11 @@ mod tests {
         let expr = parse_expr("x < y").unwrap();
         assert!(matches!(expr, Expr::BinOp(BinOp::Lt, _, _)));
 
-        let expr = parse_expr("a = b").unwrap();
+        let expr = parse_expr("a == b").unwrap();
         assert!(matches!(expr, Expr::BinOp(BinOp::Eq, _, _)));
+
+        let expr = parse_expr("a != b").unwrap();
+        assert!(matches!(expr, Expr::BinOp(BinOp::Neq, _, _)));
     }
 
     #[test]

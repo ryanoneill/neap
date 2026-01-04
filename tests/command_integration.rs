@@ -83,7 +83,7 @@ fn test_command_exit_code() {
     let source = r#"
         let result = `echo test`
         let code = result.exitCode
-        let msg = if code = 0 then "success" else "failure"
+        let msg = if code == 0 then "success" else "failure"
         let p = print msg
     "#;
 
@@ -125,7 +125,7 @@ fn test_command_pipeline_exit_code() {
     let source = r#"
         let result = `echo test` |> `cat`
         let code = result.exitCode
-        let p = print (if code = 0 then "success" else "failure")
+        let p = print (if code == 0 then "success" else "failure")
     "#;
 
     let output = run_program(source).expect("Program should run");

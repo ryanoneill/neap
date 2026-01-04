@@ -621,7 +621,7 @@ impl<'src> Lexer<'src> {
         if self.rest.starts_with("<=") {
             return make_token(TokenKind::Le, 2, self);
         }
-        if self.rest.starts_with("<>") {
+        if self.rest.starts_with("!=") {
             return make_token(TokenKind::Neq, 2, self);
         }
         if self.rest.starts_with("<-") {
@@ -647,6 +647,9 @@ impl<'src> Lexer<'src> {
         }
         if self.rest.starts_with("++") {
             return make_token(TokenKind::PlusPlus, 2, self);
+        }
+        if self.rest.starts_with("==") {
+            return make_token(TokenKind::EqEq, 2, self);
         }
 
         // Single-character operators and punctuation
@@ -1037,11 +1040,11 @@ mod tests {
 
     #[test]
     fn comparison_operators() {
-        let tokens = token_kinds("= <> < > <= >=").unwrap();
+        let tokens = token_kinds("== != < > <= >=").unwrap();
         assert_eq!(
             tokens,
             vec![
-                TokenKind::Eq,
+                TokenKind::EqEq,
                 TokenKind::Neq,
                 TokenKind::Lt,
                 TokenKind::Gt,
@@ -1049,6 +1052,15 @@ mod tests {
                 TokenKind::Ge,
                 TokenKind::Eof,
             ]
+        );
+    }
+
+    #[test]
+    fn assignment_vs_equality() {
+        let tokens = token_kinds("= ==").unwrap();
+        assert_eq!(
+            tokens,
+            vec![TokenKind::Eq, TokenKind::EqEq, TokenKind::Eof,]
         );
     }
 

@@ -8,7 +8,7 @@
 //!
 //! # Testing Example
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use neap::repl::ReplTestHarness;
 //!
 //! #[tokio::test]

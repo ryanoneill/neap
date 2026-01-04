@@ -1434,12 +1434,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "stack overflow when resolving show trait on polymorphic type - needs investigation"]
     fn check_show_in_fun() {
         // Using show in a function
         let result = check(
             r#"
-            fun showTwice x = show x ++ " " ++ show x
+            fn showTwice x = show x ++ " " ++ show x
             let result = showTwice 5
         "#,
         );

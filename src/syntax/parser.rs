@@ -150,28 +150,16 @@ impl Parser {
         let start = self.expect(TokenKind::Fun)?.span;
         let name = self.expect_ident()?;
 
-        let mut clauses = Vec::new();
-        clauses.push(self.parse_fun_clause()?);
-
-        // Parse additional clauses with |
-        while self.eat(TokenKind::Bar) {
-            // Expect the function name again
-            let clause_name = self.expect_ident()?;
-            if clause_name.value != name.value {
-                return Err(ParseError::UnexpectedToken {
-                    expected: format!("function name '{}'", name.value),
-                    found: clause_name.value,
-                    span: clause_name.span,
-                });
-            }
-            clauses.push(self.parse_fun_clause()?);
-        }
-
-        let end_span = clauses.last().map(|c| c.body.span).unwrap_or(name.span);
+        // Single clause only - use match expressions for pattern matching
+        let clause = self.parse_fun_clause()?;
+        let end_span = clause.body.span;
         let span = start.merge(end_span);
 
         Ok(Spanned::new(
-            Decl::Fun(FunDecl { name, clauses }),
+            Decl::Fun(FunDecl {
+                name,
+                clauses: vec![clause],
+            }),
             span,
         ))
     }

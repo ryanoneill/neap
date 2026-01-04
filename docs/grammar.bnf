@@ -1,0 +1,168 @@
+(* Neap Language Grammar - BNF Representation *)
+(* Note: Uses EBNF notation where { } means zero or more, [ ] means optional *)
+
+(* ========== Top-Level Program ========== *)
+
+program     ::= { decl }
+
+decl        ::= val_decl
+              | fun_decl
+              | type_decl
+              | datatype_decl
+              | trait_decl
+              | impl_decl
+
+(* ========== Declarations ========== *)
+
+val_decl    ::= "let" [ "rec" ] pattern [ ":" type ] "=" expr
+
+fun_decl    ::= "fun" IDENT { atomic_pattern } [ ":" type ] "=" expr
+
+type_decl   ::= "type" IDENT [ type_params ] "=" type
+
+datatype_decl ::= "datatype" IDENT [ type_params ] "=" [ "|" ] constructor { "|" constructor }
+
+type_params ::= "<" UPPER_IDENT { "," UPPER_IDENT } ">"
+
+constructor ::= UPPER_IDENT [ atomic_type ]
+
+trait_decl  ::= "trait" UPPER_IDENT "{" { method_sig } "}"
+
+method_sig  ::= "fn" IDENT "(" [ IDENT { "," IDENT } ] ")" "->" type
+
+impl_decl   ::= "impl" UPPER_IDENT "for" type "{" { method_impl } "}"
+
+method_impl ::= "fn" IDENT "(" [ IDENT { "," IDENT } ] ")" [ "->" type ] "=" expr
+
+(* ========== Expressions ========== *)
+
+expr        ::= prefix_expr { infix_op expr }
+              | prefix_expr { postfix_op }
+
+prefix_expr ::= "-" prefix_expr
+              | "!" prefix_expr
+              | if_expr
+              | match_expr
+              | do_expr
+              | atomic_expr
+
+if_expr     ::= "if" expr "then" expr "else" expr
+
+match_expr  ::= "match" expr [ "|" ] match_arm { "|" match_arm }
+
+match_arm   ::= pattern "->" expr
+
+do_expr     ::= "do" { do_stmt [ ";" ] } "end"
+
+do_stmt     ::= "let" pattern "=" expr
+              | expr "<-" expr          (* bind *)
+              | expr                    (* action *)
+
+atomic_expr ::= literal
+              | IDENT                   (* variable *)
+              | UPPER_IDENT             (* constructor *)
+              | "$" any_ident           (* environment variable *)
+              | "(" ")"                 (* unit *)
+              | "(" expr ")"            (* parenthesized *)
+              | "(" expr "," expr { "," expr } ")"  (* tuple *)
+              | "(" { atomic_pattern { "," atomic_pattern } } ")" "=>" expr  (* lambda *)
+              | "[" "]"                 (* empty list *)
+              | "[" expr { "," expr } "]"  (* list *)
+              | "{" "}"                 (* empty record *)
+              | "{" record_field { "," record_field } "}"  (* record *)
+              | "`" { command_part } "`"  (* shell command *)
+
+record_field ::= IDENT "=" expr
+
+command_part ::= COMMAND_TEXT           (* literal text *)
+               | "{" expr "}"           (* interpolation *)
+
+(* ========== Operators ========== *)
+
+(* Listed from lowest to highest precedence *)
+infix_op    ::= "|>"                    (* pipe, left-assoc, prec 1 *)
+              | ":"                     (* type annotation, prec 2 *)
+              | "||"                    (* logical or, left-assoc, prec 3 *)
+              | "&&"                    (* logical and, left-assoc, prec 5 *)
+              | "==" | "!=" | "<" | "<=" | ">" | ">="  (* comparison, prec 7 *)
+              | "::" | "@"              (* cons/append, right-assoc, prec 10 *)
+              | "++"                    (* string concat, prec 11 *)
+              | "+" | "-"               (* add/sub, left-assoc, prec 13 *)
+              | "*" | "/" | "%"         (* mul/div/mod, left-assoc, prec 15 *)
+
+postfix_op  ::= atomic_expr             (* function application, prec 21 *)
+              | "." IDENT               (* field access, prec 25 *)
+
+prefix_op   ::= "-"                     (* unary negation, prec 23 *)
+              | "!"                     (* logical not, prec 23 *)
+
+(* ========== Patterns ========== *)
+
+pattern     ::= atomic_pattern [ "::" pattern ]  (* cons, right-assoc *)
+              | atomic_pattern [ "|" pattern ]   (* or pattern *)
+
+atomic_pattern ::= "_"                  (* wildcard *)
+                 | IDENT                (* variable *)
+                 | UPPER_IDENT [ atomic_pattern ]  (* constructor *)
+                 | literal              (* literal pattern *)
+                 | "(" ")"              (* unit pattern *)
+                 | "(" pattern ")"      (* parenthesized *)
+                 | "(" pattern "," pattern { "," pattern } ")"  (* tuple *)
+                 | "[" "]"              (* empty list *)
+                 | "[" pattern { "," pattern } "]"  (* list *)
+                 | "{" "}"              (* empty record *)
+                 | "{" record_pattern_field { "," record_pattern_field } "}"
+
+record_pattern_field ::= IDENT [ "=" pattern ]  (* field, with optional punning *)
+
+(* ========== Types ========== *)
+
+type        ::= type_app [ "->" type ]  (* function type, right-assoc *)
+
+type_app    ::= atomic_type [ IDENT ]   (* type application: A list, int option *)
+
+atomic_type ::= UPPER_IDENT             (* type variable: A, B, T *)
+              | IDENT                   (* type constructor: int, string, list *)
+              | "(" ")"                 (* unit type *)
+              | "(" type ")"            (* parenthesized *)
+              | "(" type "," type { "," type } ")"  (* tuple type *)
+              | "{" "}"                 (* empty record type *)
+              | "{" record_type_field { "," record_type_field } "}"
+
+record_type_field ::= IDENT ":" type
+
+(* ========== Literals ========== *)
+
+literal     ::= INT                     (* 42, 0xFF, 0b1010, 0o777 *)
+              | FLOAT                   (* 3.14, 1e10, 2.5e-3 *)
+              | STRING                  (* "hello\n" *)
+              | CHAR                    (* 'a', '\n' *)
+              | "true" | "false"        (* booleans *)
+
+(* ========== Terminals ========== *)
+
+IDENT       ::= [a-z_][a-zA-Z0-9_']*    (* lowercase identifier *)
+UPPER_IDENT ::= [A-Z][a-zA-Z0-9_']*     (* uppercase identifier *)
+any_ident   ::= IDENT | UPPER_IDENT     (* for $ENV_VAR *)
+
+INT         ::= [0-9]+ | "0x" [0-9a-fA-F]+ | "0b" [01]+ | "0o" [0-7]+
+FLOAT       ::= [0-9]+ "." [0-9]* [ ("e"|"E") [+-]? [0-9]+ ]
+STRING      ::= '"' { char | escape } '"'
+CHAR        ::= "'" ( char | escape ) "'"
+COMMAND_TEXT ::= (* any text inside backticks except { and ` *)
+
+escape      ::= "\\" | "\n" | "\t" | "\r" | '\"' | "\'"
+char        ::= (* any character except \ and the delimiter *)
+
+(* ========== Keywords ========== *)
+
+(* Reserved words that cannot be used as identifiers:
+   let, rec, in, fun, fn, and, match, case, of, with,
+   datatype, type, if, then, else, do, end, true, false,
+   trait, impl, for
+*)
+
+(* ========== Comments ========== *)
+
+comment     ::= "--" { any_char } newline       (* line comment *)
+              | "(*" { any_char | comment } "*)" (* nested block comment *)

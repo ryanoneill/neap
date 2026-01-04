@@ -52,7 +52,7 @@ pub struct ValDecl {
 pub struct FunDecl {
     /// The function name
     pub name: Spanned<String>,
-    /// The function clauses (for pattern matching on arguments)
+    /// The function clause (single clause; use match for pattern matching)
     pub clauses: Vec<FunClause>,
 }
 

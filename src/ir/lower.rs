@@ -16,7 +16,7 @@ use crate::syntax::{
 use crate::types::{Type, TypeChecker, TypeError};
 
 use super::core::{
-    Binding, IRCommandPart, IRDecl, IRExpr, IRLiteral, IRPattern, IRProgram, Primitive, VarId,
+    IRCommandPart, IRDecl, IRExpr, IRLiteral, IRPattern, IRProgram, Primitive, VarId,
 };
 
 /// Errors that can occur during lowering.
@@ -424,14 +424,6 @@ impl Lower {
             Expr::App(func, arg) => self.lower_app(func, arg, ty),
 
             Expr::Lambda(params, body) => self.lower_lambda(params, body, ty),
-
-            Expr::Let {
-                rec,
-                pattern,
-                value,
-                body,
-                ..
-            } => self.lower_let(*rec, pattern, value, body, ty),
 
             Expr::If(cond, then_expr, else_expr) => {
                 self.lower_if(cond, then_expr, else_expr, ty)
@@ -905,61 +897,6 @@ impl Lower {
             body: Box::new(inner),
             result_ty: inner_result_ty,
         })
-    }
-
-    /// Lower a let expression.
-    fn lower_let(
-        &mut self,
-        rec: bool,
-        pattern: &Spanned<Pattern>,
-        value: &Spanned<Expr>,
-        body: &Spanned<Expr>,
-        body_ty: &Type,
-    ) -> Result<IRExpr, LowerError> {
-        let value_ty = self.expr_type(value)?;
-
-        if rec {
-            // Recursive let
-            let name = match &pattern.value {
-                Pattern::Var(n) => n.clone(),
-                _ => {
-                    return Err(LowerError::Unsupported(
-                        "recursive let with complex pattern".to_string(),
-                    ))
-                }
-            };
-
-            let var_id = VarId::fresh();
-            self.vars.insert(name.clone(), var_id);
-            self.var_types.insert(var_id, value_ty.clone());
-
-            let ir_value = self.lower_expr(value, &value_ty)?;
-            let ir_body = self.lower_expr(body, body_ty)?;
-
-            self.vars.remove(&name);
-
-            Ok(IRExpr::LetRec {
-                bindings: vec![Binding {
-                    var: var_id,
-                    ty: value_ty,
-                    value: ir_value,
-                }],
-                body: Box::new(ir_body),
-            })
-        } else {
-            // Non-recursive let
-            let var_id = self.bind_pattern(&pattern.value, &value_ty)?;
-            let ir_value = self.lower_expr(value, &value_ty)?;
-            let ir_body = self.lower_expr(body, body_ty)?;
-            self.unbind_pattern(&pattern.value);
-
-            Ok(IRExpr::Let {
-                var: var_id,
-                ty: value_ty,
-                value: Box::new(ir_value),
-                body: Box::new(ir_body),
-            })
-        }
     }
 
     /// Lower an if expression.
@@ -1697,18 +1634,6 @@ mod tests {
         match &ir.decls[0] {
             IRDecl::Val { value, .. } => {
                 assert!(matches!(value, IRExpr::If { .. }));
-            }
-            _ => panic!("expected val decl"),
-        }
-    }
-
-    #[test]
-    fn lower_let_expr() {
-        let ir = lower_program("let x = let y = 1 in y + 1").expect("lower error");
-
-        match &ir.decls[0] {
-            IRDecl::Val { value, .. } => {
-                assert!(matches!(value, IRExpr::Let { .. }));
             }
             _ => panic!("expected val decl"),
         }

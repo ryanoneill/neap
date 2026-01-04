@@ -473,9 +473,6 @@ impl Parser {
                 ))
             }
 
-            // Let expression
-            Some(TokenKind::Let) => self.parse_let_expr(),
-
             // Lambda
             Some(TokenKind::Fn) => self.parse_lambda(),
 
@@ -692,37 +689,6 @@ impl Parser {
                 }
             }
         }
-    }
-
-    fn parse_let_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
-        let start = self.expect(TokenKind::Let)?.span;
-        let rec = self.eat(TokenKind::Rec);
-
-        let pattern = self.parse_pattern()?;
-
-        let ty = if self.eat(TokenKind::Colon) {
-            Some(Box::new(self.parse_type()?))
-        } else {
-            None
-        };
-
-        self.expect(TokenKind::Eq)?;
-        let value = self.parse_expr()?;
-
-        self.expect(TokenKind::In)?;
-        let body = self.parse_expr()?;
-
-        let span = start.merge(body.span);
-        Ok(Spanned::new(
-            Expr::Let {
-                rec,
-                pattern: Box::new(pattern),
-                ty,
-                value: Box::new(value),
-                body: Box::new(body),
-            },
-            span,
-        ))
     }
 
     fn parse_lambda(&mut self) -> Result<Spanned<Expr>, ParseError> {
@@ -1841,23 +1807,7 @@ mod tests {
         }
     }
 
-    // ========== Let and Lambda Tests ==========
-
-    #[test]
-    fn parse_let_expr() {
-        let expr = parse_expr("let x = 1 in x + 1").unwrap();
-        assert!(matches!(expr, Expr::Let { .. }));
-    }
-
-    #[test]
-    fn parse_let_rec() {
-        let expr = parse_expr("let rec f = fn x => f x in f 0").unwrap();
-        if let Expr::Let { rec, .. } = expr {
-            assert!(rec);
-        } else {
-            panic!("Expected Let");
-        }
-    }
+    // ========== Lambda Tests ==========
 
     #[test]
     fn parse_lambda() {
@@ -2277,12 +2227,6 @@ mod tests {
     }
 
     // ========== Complex Expression Tests ==========
-
-    #[test]
-    fn parse_complex_expr() {
-        let expr = parse_expr("let f = fn x => x * 2 in f (3 + 4)").unwrap();
-        assert!(matches!(expr, Expr::Let { .. }));
-    }
 
     #[test]
     fn parse_nested_match() {

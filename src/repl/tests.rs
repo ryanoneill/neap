@@ -73,22 +73,6 @@ async fn test_unbound_variable() {
 }
 
 #[tokio::test]
-async fn test_local_let_binding() {
-    let mut repl = ReplTestHarness::new();
-    let r = repl.input("let x = 1 in x + 1").await;
-    assert_eq!(r.value_str(), Some("2"));
-}
-
-#[tokio::test]
-async fn test_nested_let() {
-    let mut repl = ReplTestHarness::new();
-    let r = repl
-        .input("let x = 1 in let y = 2 in x + y")
-        .await;
-    assert_eq!(r.value_str(), Some("3"));
-}
-
-#[tokio::test]
 async fn test_type_command() {
     let mut repl = ReplTestHarness::new();
     let r = repl.input(":type 1 + 2").await;

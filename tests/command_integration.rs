@@ -56,10 +56,8 @@ fn test_simple_command() {
 fn test_command_stdout_field() {
     // Access the stdout field of a command result
     let source = r#"
-        fun main x =
-            let result = `echo hello` in
-            result.stdout
-        let out = main 1
+        let result = `echo hello`
+        let out = result.stdout
         let p = print out
     "#;
 
@@ -70,11 +68,9 @@ fn test_command_stdout_field() {
 #[test]
 fn test_command_with_interpolation() {
     let source = r#"
-        fun main x =
-            let name = "world" in
-            let result = `echo {name}` in
-            result.stdout
-        let out = main 1
+        let name = "world"
+        let result = `echo {name}`
+        let out = result.stdout
         let p = print out
     "#;
 
@@ -85,11 +81,9 @@ fn test_command_with_interpolation() {
 #[test]
 fn test_command_exit_code() {
     let source = r#"
-        fun main x =
-            let result = `echo test` in
-            let code = result.exitCode in
-            if code = 0 then "success" else "failure"
-        let msg = main 1
+        let result = `echo test`
+        let code = result.exitCode
+        let msg = if code = 0 then "success" else "failure"
         let p = print msg
     "#;
 
@@ -103,10 +97,8 @@ fn test_command_exit_code() {
 fn test_command_pipeline() {
     // Simple pipeline: echo | grep
     let source = r#"
-        fun main x =
-            let result = `echo hello world` |> `grep world` in
-            result.stdout
-        let out = main 1
+        let result = `echo hello world` |> `grep world`
+        let out = result.stdout
         let p = print out
     "#;
 
@@ -118,10 +110,8 @@ fn test_command_pipeline() {
 fn test_command_pipeline_filtering() {
     // Pipeline that filters content
     let source = r#"
-        fun main x =
-            let result = `echo hello` |> `cat` in
-            result.stdout
-        let out = main 1
+        let result = `echo hello` |> `cat`
+        let out = result.stdout
         let p = print out
     "#;
 
@@ -133,10 +123,8 @@ fn test_command_pipeline_filtering() {
 fn test_command_pipeline_exit_code() {
     // The exit code should be from the last command in the pipeline
     let source = r#"
-        fun main x =
-            let result = `echo test` |> `cat` in
-            result.exitCode
-        let code = main 1
+        let result = `echo test` |> `cat`
+        let code = result.exitCode
         let p = print (if code = 0 then "success" else "failure")
     "#;
 

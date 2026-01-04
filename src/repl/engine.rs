@@ -180,9 +180,7 @@ impl<W: Write, R: BufRead> ReplEngine<W, R> {
             Err(_) => return Ok(None), // Not a declaration, try expression
         };
 
-        // Check that we consumed all input - if there's leftover input,
-        // this might be a local let expression (e.g., `let x = 1 in x + 1`)
-        // rather than a top-level declaration
+        // Check that we consumed all input
         if !parser.is_at_end() {
             return Ok(None); // Try as expression instead
         }
@@ -320,11 +318,9 @@ impl<W: Write, R: BufRead> ReplEngine<W, R> {
     }
 
     /// Check if an error message suggests incomplete input.
-    fn is_incomplete_input(&self, input: &str, error: &str) -> bool {
+    fn is_incomplete_input(&self, _input: &str, error: &str) -> bool {
         // Common patterns for incomplete input
-        error.contains("unexpected end of input")
-            || error.contains("expected")
-            || (input.contains("let") && !input.contains("in"))
+        error.contains("unexpected end of input") || error.contains("expected")
     }
 
     /// Get the name from a pattern (for simple variable patterns).

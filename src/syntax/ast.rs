@@ -179,15 +179,6 @@ pub enum Expr {
     /// Lambda expression: `fn p => e`
     Lambda(Vec<Spanned<Pattern>>, Box<Spanned<Expr>>),
 
-    /// Let binding: `let p = e1 in e2`
-    Let {
-        rec: bool,
-        pattern: Box<Spanned<Pattern>>,
-        ty: Option<Box<Spanned<TypeExpr>>>,
-        value: Box<Spanned<Expr>>,
-        body: Box<Spanned<Expr>>,
-    },
-
     /// Conditional: `if e1 then e2 else e3`
     If(Box<Spanned<Expr>>, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
 

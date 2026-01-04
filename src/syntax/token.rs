@@ -257,7 +257,6 @@ impl TokenKind {
         matches!(
             self,
             Self::Let
-                | Self::Fn
                 | Self::If
                 | Self::Match
                 | Self::Case

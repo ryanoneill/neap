@@ -1691,7 +1691,7 @@ mod tests {
 
     #[test]
     fn lower_lambda() {
-        let ir = lower_program("let f = fn x => x + 1").expect("lower error");
+        let ir = lower_program("let f = (x) => x + 1").expect("lower error");
 
         match &ir.decls[0] {
             IRDecl::Val { value, .. } => {

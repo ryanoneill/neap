@@ -1184,12 +1184,14 @@ mod tests {
 
     #[test]
     fn function_definition() {
-        let tokens = token_kinds("fn x => x * 2").unwrap();
+        // Test lambda syntax: (x) => expr
+        let tokens = token_kinds("(x) => x * 2").unwrap();
         assert_eq!(
             tokens,
             vec![
-                TokenKind::Fn,
+                TokenKind::LParen,
                 TokenKind::Ident("x".to_string()),
+                TokenKind::RParen,
                 TokenKind::FatArrow,
                 TokenKind::Ident("x".to_string()),
                 TokenKind::Star,
@@ -1240,7 +1242,7 @@ mod tests {
 
     #[test]
     fn type_annotation() {
-        let tokens = token_kinds("let x: int -> int = fn y => y").unwrap();
+        let tokens = token_kinds("let x: int -> int = (y) => y").unwrap();
         assert_eq!(
             tokens,
             vec![
@@ -1251,8 +1253,9 @@ mod tests {
                 TokenKind::Arrow,
                 TokenKind::Ident("int".to_string()),
                 TokenKind::Eq,
-                TokenKind::Fn,
+                TokenKind::LParen,
                 TokenKind::Ident("y".to_string()),
+                TokenKind::RParen,
                 TokenKind::FatArrow,
                 TokenKind::Ident("y".to_string()),
                 TokenKind::Eof,

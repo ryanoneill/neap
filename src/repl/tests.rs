@@ -93,7 +93,7 @@ async fn test_type_command() {
 #[tokio::test]
 async fn test_type_command_function() {
     let mut repl = ReplTestHarness::new();
-    let r = repl.input(":type fn x => x + 1").await;
+    let r = repl.input(":type (x) => x + 1").await;
     assert_eq!(r.type_str(), Some("int -> int"));
 }
 
@@ -206,7 +206,7 @@ async fn test_record_field_access() {
 #[tokio::test]
 async fn test_lambda() {
     let mut repl = ReplTestHarness::new();
-    let r = repl.input("(fn x => x + 1) 5").await;
+    let r = repl.input("((x) => x + 1) 5").await;
     assert_eq!(r.value_str(), Some("6"));
 }
 

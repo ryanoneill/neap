@@ -176,7 +176,7 @@ pub enum Expr {
     /// Function application
     App(Box<Spanned<Expr>>, Box<Spanned<Expr>>),
 
-    /// Lambda expression: `fn p => e`
+    /// Lambda expression: `(x, y) => e`
     Lambda(Vec<Spanned<Pattern>>, Box<Spanned<Expr>>),
 
     /// Conditional: `if e1 then e2 else e3`

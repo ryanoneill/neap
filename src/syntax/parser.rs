@@ -498,9 +498,6 @@ impl Parser {
                 ))
             }
 
-            // Lambda
-            Some(TokenKind::Fn) => self.parse_lambda(),
-
             // Conditional
             Some(TokenKind::If) => self.parse_if_expr(),
 
@@ -595,6 +592,11 @@ impl Parser {
     }
 
     fn parse_paren_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
+        // Check if this is a lambda: (...) =>
+        if self.is_lambda_start() {
+            return self.parse_lambda();
+        }
+
         let start = self.expect(TokenKind::LParen)?.span;
 
         // Unit: ()
@@ -620,6 +622,34 @@ impl Parser {
         // Parenthesized expression
         let end = self.expect(TokenKind::RParen)?.span;
         Ok(Spanned::new(first.value, start.merge(end)))
+    }
+
+    /// Check if current position starts a lambda: `(...) =>`
+    fn is_lambda_start(&self) -> bool {
+        if !matches!(self.peek_kind(), Some(TokenKind::LParen)) {
+            return false;
+        }
+
+        // Scan ahead to find matching ) and check for =>
+        let mut depth = 0;
+        let mut i = self.pos;
+        while i < self.tokens.len() {
+            match &self.tokens[i].kind {
+                TokenKind::LParen => depth += 1,
+                TokenKind::RParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        // Check if followed by =>
+                        return i + 1 < self.tokens.len()
+                            && matches!(self.tokens[i + 1].kind, TokenKind::FatArrow);
+                    }
+                }
+                TokenKind::Eof => return false,
+                _ => {}
+            }
+            i += 1;
+        }
+        false
     }
 
     fn parse_list_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
@@ -716,14 +746,21 @@ impl Parser {
         }
     }
 
+    /// Parse a lambda expression: `(x, y) => expr` or `() => expr`
     fn parse_lambda(&mut self) -> Result<Spanned<Expr>, ParseError> {
-        let start = self.expect(TokenKind::Fn)?.span;
+        let start = self.expect(TokenKind::LParen)?.span;
 
         let mut params = Vec::new();
-        while !matches!(self.peek_kind(), Some(TokenKind::FatArrow) | None) {
+
+        // Parse parameters: (x, y) or ()
+        if !matches!(self.peek_kind(), Some(TokenKind::RParen)) {
             params.push(self.parse_atomic_pattern()?);
+            while self.eat(TokenKind::Comma) {
+                params.push(self.parse_atomic_pattern()?);
+            }
         }
 
+        self.expect(TokenKind::RParen)?;
         self.expect(TokenKind::FatArrow)?;
         let body = self.parse_expr()?;
 
@@ -1839,7 +1876,7 @@ mod tests {
 
     #[test]
     fn parse_lambda() {
-        let expr = parse_expr("fn x => x + 1").unwrap();
+        let expr = parse_expr("(x) => x + 1").unwrap();
         if let Expr::Lambda(params, _) = expr {
             assert_eq!(params.len(), 1);
         } else {
@@ -1849,7 +1886,7 @@ mod tests {
 
     #[test]
     fn parse_multi_param_lambda() {
-        let expr = parse_expr("fn x y => x + y").unwrap();
+        let expr = parse_expr("(x, y) => x + y").unwrap();
         if let Expr::Lambda(params, _) = expr {
             assert_eq!(params.len(), 2);
         } else {

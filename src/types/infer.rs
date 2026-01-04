@@ -1220,7 +1220,7 @@ mod tests {
 
     #[test]
     fn infer_identity() {
-        let ty = infer("fn x => x").unwrap();
+        let ty = infer("(x) => x").unwrap();
         // Should be 'a -> 'a
         let (args, ret) = ty.collect_arrow_args();
         assert_eq!(args.len(), 1);
@@ -1229,7 +1229,7 @@ mod tests {
 
     #[test]
     fn infer_const() {
-        let ty = infer("fn x y => x").unwrap();
+        let ty = infer("(x, y) => x").unwrap();
         // Should be 'a -> 'b -> 'a
         let (args, ret) = ty.collect_arrow_args();
         assert_eq!(args.len(), 2);
@@ -1238,7 +1238,7 @@ mod tests {
 
     #[test]
     fn infer_lambda_typed() {
-        let ty = infer("fn x => x + 1").unwrap();
+        let ty = infer("(x) => x + 1").unwrap();
         assert_eq!(ty, Type::arrow(Type::int(), Type::int()));
     }
 
@@ -1268,7 +1268,7 @@ mod tests {
 
     #[test]
     fn infer_app() {
-        let ty = infer("(fn x => x + 1) 5").unwrap();
+        let ty = infer("((x) => x + 1) 5").unwrap();
         assert_eq!(ty, Type::int());
     }
 
@@ -1296,7 +1296,7 @@ mod tests {
 
     #[test]
     fn infer_pipe() {
-        let ty = infer("1 |> (fn x => x + 1)").unwrap();
+        let ty = infer("1 |> ((x) => x + 1)").unwrap();
         assert_eq!(ty, Type::int());
     }
 

@@ -1260,7 +1260,7 @@ mod tests {
 
     #[test]
     fn infer_match_bool() {
-        let ty = infer("match true with | true -> 1 | false -> 0").unwrap();
+        let ty = infer("match true | true -> 1 | false -> 0").unwrap();
         assert_eq!(ty, Type::int());
     }
 

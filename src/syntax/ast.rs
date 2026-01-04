@@ -182,7 +182,7 @@ pub enum Expr {
     /// Conditional: `if e1 then e2 else e3`
     If(Box<Spanned<Expr>>, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
 
-    /// Pattern matching: `match e with | p1 -> e1 | p2 -> e2`
+    /// Pattern matching: `match e | p1 -> e1 | p2 -> e2`
     Match(Box<Spanned<Expr>>, Vec<MatchArm>),
 
     /// Binary operation

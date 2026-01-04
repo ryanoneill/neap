@@ -796,7 +796,7 @@ impl Parser {
         let start = self.expect(TokenKind::Match)?.span;
         let scrutinee = self.parse_expr()?;
 
-        self.expect(TokenKind::With)?;
+        // Note: 'with' keyword is no longer required
 
         // Optional leading |
         self.eat(TokenKind::Bar);
@@ -1896,7 +1896,7 @@ mod tests {
 
     #[test]
     fn parse_match_expr() {
-        let expr = parse_expr("match x with | Some y -> y | None -> 0").unwrap();
+        let expr = parse_expr("match x | Some y -> y | None -> 0").unwrap();
         if let Expr::Match(_, arms) = expr {
             assert_eq!(arms.len(), 2);
         } else {
@@ -2277,7 +2277,7 @@ mod tests {
     #[test]
     fn parse_nested_match() {
         let source = r#"
-            match x with
+            match x
             | Some (Some y) -> y
             | Some None -> 0
             | None -> 0

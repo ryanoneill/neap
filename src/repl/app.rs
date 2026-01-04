@@ -39,6 +39,11 @@ pub struct ReplState {
     should_quit: bool,
     /// Pending output from evaluation (since we can't store engine in Clone state).
     pending_eval: Option<String>,
+    /// Current position in command history for Up/Down navigation.
+    /// None means we're at the current (new) input position.
+    history_nav_index: Option<usize>,
+    /// Saved input before starting history navigation.
+    saved_input: String,
 }
 
 impl Default for ReplState {
@@ -51,6 +56,8 @@ impl Default for ReplState {
             scroll_offset: 0,
             should_quit: false,
             pending_eval: None,
+            history_nav_index: None,
+            saved_input: String::new(),
         }
     }
 }
@@ -62,9 +69,13 @@ pub enum ReplMsg {
     Input(InputMessage),
     /// Submit the current input.
     Submit,
-    /// Scroll history up.
+    /// Navigate to previous command in history (Up arrow).
+    HistoryPrev,
+    /// Navigate to next command in history (Down arrow).
+    HistoryNext,
+    /// Scroll output view up (Shift+Up or PageUp).
     ScrollUp,
-    /// Scroll history down.
+    /// Scroll output view down (Shift+Down or PageDown).
     ScrollDown,
     /// Clear the screen/history.
     Clear,
@@ -94,7 +105,11 @@ impl App for NeapReplApp {
                         InputOutput::Submitted(_) => {
                             return Command::message(ReplMsg::Submit);
                         }
-                        InputOutput::Changed(_) => {}
+                        InputOutput::Changed(_) => {
+                            // Reset history navigation when user types
+                            state.history_nav_index = None;
+                            state.saved_input.clear();
+                        }
                     }
                 }
             }
@@ -104,6 +119,52 @@ impl App for NeapReplApp {
                     // Store the input for processing by the external loop
                     state.pending_eval = Some(input);
                     state.input.set_value("");
+                    // Reset history navigation
+                    state.history_nav_index = None;
+                    state.saved_input.clear();
+                }
+            }
+            ReplMsg::HistoryPrev => {
+                if state.history.is_empty() {
+                    return Command::none();
+                }
+
+                match state.history_nav_index {
+                    None => {
+                        // Starting navigation - save current input and go to last history item
+                        state.saved_input = state.input.value().to_string();
+                        let idx = state.history.len() - 1;
+                        state.history_nav_index = Some(idx);
+                        state.input.set_value(&state.history[idx].input);
+                    }
+                    Some(idx) if idx > 0 => {
+                        // Go to previous (older) item
+                        let new_idx = idx - 1;
+                        state.history_nav_index = Some(new_idx);
+                        state.input.set_value(&state.history[new_idx].input);
+                    }
+                    Some(_) => {
+                        // Already at oldest item, do nothing
+                    }
+                }
+            }
+            ReplMsg::HistoryNext => {
+                match state.history_nav_index {
+                    None => {
+                        // Not navigating, do nothing
+                    }
+                    Some(idx) if idx < state.history.len() - 1 => {
+                        // Go to next (newer) item
+                        let new_idx = idx + 1;
+                        state.history_nav_index = Some(new_idx);
+                        state.input.set_value(&state.history[new_idx].input);
+                    }
+                    Some(_) => {
+                        // At newest history item, go back to saved input
+                        state.history_nav_index = None;
+                        state.input.set_value(&state.saved_input);
+                        state.saved_input.clear();
+                    }
                 }
             }
             ReplMsg::ScrollUp => {
@@ -116,6 +177,8 @@ impl App for NeapReplApp {
             ReplMsg::Clear => {
                 state.history.clear();
                 state.scroll_offset = 0;
+                state.history_nav_index = None;
+                state.saved_input.clear();
             }
             ReplMsg::Quit => {
                 state.should_quit = true;
@@ -168,6 +231,14 @@ impl App for NeapReplApp {
                 // Handle special keys
                 match key.code {
                     KeyCode::Enter => Some(ReplMsg::Submit),
+                    // Up/Down for command history navigation (like readline)
+                    KeyCode::Up if !key.modifiers.contains(KeyModifiers::SHIFT) => {
+                        Some(ReplMsg::HistoryPrev)
+                    }
+                    KeyCode::Down if !key.modifiers.contains(KeyModifiers::SHIFT) => {
+                        Some(ReplMsg::HistoryNext)
+                    }
+                    // Shift+Up/Down or PageUp/PageDown for scrolling output
                     KeyCode::Up if key.modifiers.contains(KeyModifiers::SHIFT) => {
                         Some(ReplMsg::ScrollUp)
                     }

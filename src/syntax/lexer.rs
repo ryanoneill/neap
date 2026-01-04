@@ -731,7 +731,7 @@ mod tests {
 
     #[test]
     fn keywords() {
-        let tokens = token_kinds("let in fn fun rec and match with case of").unwrap();
+        let tokens = token_kinds("let in fn fun rec or match").unwrap();
         assert_eq!(
             tokens,
             vec![
@@ -740,11 +740,8 @@ mod tests {
                 TokenKind::Fn,
                 TokenKind::Fun,
                 TokenKind::Rec,
-                TokenKind::And,
+                TokenKind::Or,
                 TokenKind::Match,
-                TokenKind::With,
-                TokenKind::Case,
-                TokenKind::Of,
                 TokenKind::Eof,
             ]
         );
@@ -1204,14 +1201,13 @@ mod tests {
 
     #[test]
     fn pattern_match() {
-        let tokens = token_kinds("match x with | Some y -> y | None -> 0").unwrap();
+        let tokens = token_kinds("match x { Some y -> y | None -> 0 }").unwrap();
         assert_eq!(
             tokens,
             vec![
                 TokenKind::Match,
                 TokenKind::Ident("x".to_string()),
-                TokenKind::With,
-                TokenKind::Bar,
+                TokenKind::LBrace,
                 TokenKind::UpperIdent("Some".to_string()),
                 TokenKind::Ident("y".to_string()),
                 TokenKind::Arrow,
@@ -1220,6 +1216,7 @@ mod tests {
                 TokenKind::UpperIdent("None".to_string()),
                 TokenKind::Arrow,
                 TokenKind::Int(0),
+                TokenKind::RBrace,
                 TokenKind::Eof,
             ]
         );

@@ -28,24 +28,18 @@ pub enum TokenKind {
     // ========== Keywords ==========
     /// `let` - value binding
     Let,
-    /// `in` - let body
+    /// `in` - let...in expression body
     In,
-    /// `fn` - anonymous function
+    /// `fn` - method signature in traits
     Fn,
     /// `fun` - named function
     Fun,
     /// `rec` - recursive binding
     Rec,
-    /// `and` - parallel bindings
-    And,
     /// `match` - pattern matching
     Match,
-    /// `with` - match arms
-    With,
-    /// `case` - case expression (alternative to match)
-    Case,
-    /// `of` - case/datatype arms
-    Of,
+    /// `or` - or-pattern in match arms
+    Or,
     /// `datatype` - algebraic data type
     Datatype,
     /// `type` - type alias
@@ -195,11 +189,8 @@ impl TokenKind {
                 | Self::Fn
                 | Self::Fun
                 | Self::Rec
-                | Self::And
                 | Self::Match
-                | Self::With
-                | Self::Case
-                | Self::Of
+                | Self::Or
                 | Self::Datatype
                 | Self::Type
                 | Self::If
@@ -286,11 +277,8 @@ impl TokenKind {
             "fn" => Some(Self::Fn),
             "fun" => Some(Self::Fun),
             "rec" => Some(Self::Rec),
-            "and" => Some(Self::And),
             "match" => Some(Self::Match),
-            "with" => Some(Self::With),
-            "case" => Some(Self::Case),
-            "of" => Some(Self::Of),
+            "or" => Some(Self::Or),
             "datatype" => Some(Self::Datatype),
             "type" => Some(Self::Type),
             "if" => Some(Self::If),
@@ -316,11 +304,8 @@ impl TokenKind {
             Self::Fn => "fn",
             Self::Fun => "fun",
             Self::Rec => "rec",
-            Self::And => "and",
             Self::Match => "match",
-            Self::With => "with",
-            Self::Case => "case",
-            Self::Of => "of",
+            Self::Or => "or",
             Self::Datatype => "datatype",
             Self::Type => "type",
             Self::If => "if",

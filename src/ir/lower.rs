@@ -425,6 +425,8 @@ impl Lower {
 
             Expr::Lambda(params, body) => self.lower_lambda(params, body, ty),
 
+            Expr::Let(pattern, value, body) => self.lower_let_expr(pattern, value, body, ty),
+
             Expr::If(cond, then_expr, else_expr) => {
                 self.lower_if(cond, then_expr, else_expr, ty)
             }
@@ -896,6 +898,56 @@ impl Lower {
             param_ty: param_ty.clone(),
             body: Box::new(inner),
             result_ty: inner_result_ty,
+        })
+    }
+
+    /// Lower a let expression: `let p = e1 in e2`
+    fn lower_let_expr(
+        &mut self,
+        pattern: &Spanned<Pattern>,
+        value: &Spanned<Expr>,
+        body: &Spanned<Expr>,
+        ty: &Type,
+    ) -> Result<IRExpr, LowerError> {
+        let value_ty = self.expr_type(value)?;
+        let ir_value = self.lower_expr(value, &value_ty)?;
+
+        // For simple variable pattern, create a direct let binding
+        if let Pattern::Var(name) = &pattern.value {
+            let var = VarId::fresh();
+            self.vars.insert(name.clone(), var);
+            self.var_types.insert(var, value_ty.clone());
+
+            let ir_body = self.lower_expr(body, ty)?;
+
+            return Ok(IRExpr::Let {
+                var,
+                ty: value_ty,
+                value: Box::new(ir_value),
+                body: Box::new(ir_body),
+            });
+        }
+
+        // For complex patterns, translate to a match expression
+        // let p = e1 in e2  =>  match e1 { p -> e2 }
+        // First bind pattern variables
+        self.bind_pattern(&pattern.value, &value_ty)?;
+
+        let ir_body = self.lower_expr(body, ty)?;
+
+        // Lower the pattern match
+        let scrutinee_var = VarId::fresh();
+        let ir_pattern = self.lower_pattern(&pattern.value, &value_ty)?;
+
+        Ok(IRExpr::Let {
+            var: scrutinee_var,
+            ty: value_ty.clone(),
+            value: Box::new(ir_value),
+            body: Box::new(IRExpr::Match {
+                scrutinee: Box::new(IRExpr::Var(scrutinee_var, value_ty)),
+                arms: vec![(ir_pattern, ir_body)],
+                ty: ty.clone(),
+            }),
         })
     }
 
@@ -1667,7 +1719,7 @@ mod tests {
 
     #[test]
     fn lower_empty_list() {
-        let ir = lower_program("let xs: int list = []").expect("lower error");
+        let ir = lower_program("let xs: list<int> = []").expect("lower error");
 
         match &ir.decls[0] {
             IRDecl::Val { value, .. } => {

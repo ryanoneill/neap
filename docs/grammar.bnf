@@ -41,14 +41,17 @@ expr        ::= prefix_expr { infix_op expr }
 
 prefix_expr ::= "-" prefix_expr
               | "!" prefix_expr
+              | let_expr
               | if_expr
               | match_expr
               | do_expr
               | atomic_expr
 
+let_expr    ::= "let" pattern "=" expr "in" expr
+
 if_expr     ::= "if" expr "then" expr "else" expr
 
-match_expr  ::= "match" expr [ "|" ] match_arm { "|" match_arm }
+match_expr  ::= "match" expr "{" [ "|" ] match_arm { "|" match_arm } "}"
 
 match_arm   ::= pattern "->" expr
 
@@ -72,7 +75,7 @@ atomic_expr ::= literal
               | "{" record_field { "," record_field } "}"  (* record *)
               | "`" { command_part } "`"  (* shell command *)
 
-record_field ::= IDENT "=" expr
+record_field ::= IDENT [ "=" expr ]     (* punning: { x } means { x = x } *)
 
 command_part ::= COMMAND_TEXT           (* literal text *)
                | "{" expr "}"           (* interpolation *)
@@ -98,8 +101,8 @@ prefix_op   ::= "-"                     (* unary negation, prec 23 *)
 
 (* ========== Patterns ========== *)
 
-pattern     ::= atomic_pattern [ "::" pattern ]  (* cons, right-assoc *)
-              | atomic_pattern [ "|" pattern ]   (* or pattern *)
+pattern     ::= atomic_pattern [ "::" pattern ]    (* cons, right-assoc *)
+              | atomic_pattern [ "or" pattern ]    (* or pattern *)
 
 atomic_pattern ::= "_"                  (* wildcard *)
                  | IDENT                (* variable *)
@@ -119,10 +122,10 @@ record_pattern_field ::= IDENT [ "=" pattern ]  (* field, with optional punning 
 
 type        ::= type_app [ "->" type ]  (* function type, right-assoc *)
 
-type_app    ::= atomic_type [ IDENT ]   (* type application: A list, int option *)
+type_app    ::= atomic_type
 
 atomic_type ::= UPPER_IDENT             (* type variable: A, B, T *)
-              | IDENT                   (* type constructor: int, string, list *)
+              | IDENT [ "<" type { "," type } ">" ]  (* type constructor with optional args *)
               | "(" ")"                 (* unit type *)
               | "(" type ")"            (* parenthesized *)
               | "(" type "," type { "," type } ")"  (* tuple type *)
@@ -157,9 +160,8 @@ char        ::= (* any character except \ and the delimiter *)
 (* ========== Keywords ========== *)
 
 (* Reserved words that cannot be used as identifiers:
-   let, rec, in, fun, fn, and, match, case, of, with,
-   datatype, type, if, then, else, do, end, true, false,
-   trait, impl, for
+   let, rec, in, fun, or, match, datatype, type, if, then, else,
+   do, end, true, false, trait, impl, for
 *)
 
 (* ========== Comments ========== *)

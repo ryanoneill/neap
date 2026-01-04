@@ -179,10 +179,13 @@ pub enum Expr {
     /// Lambda expression: `(x, y) => e`
     Lambda(Vec<Spanned<Pattern>>, Box<Spanned<Expr>>),
 
+    /// Let expression: `let p = e1 in e2`
+    Let(Spanned<Pattern>, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
+
     /// Conditional: `if e1 then e2 else e3`
     If(Box<Spanned<Expr>>, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
 
-    /// Pattern matching: `match e | p1 -> e1 | p2 -> e2`
+    /// Pattern matching: `match e { p1 -> e1 | p2 -> e2 }`
     Match(Box<Spanned<Expr>>, Vec<MatchArm>),
 
     /// Binary operation

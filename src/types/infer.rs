@@ -302,6 +302,8 @@ impl TypeChecker {
 
             Expr::Lambda(params, body) => self.infer_lambda(params, body),
 
+            Expr::Let(pattern, value, body) => self.infer_let_expr(pattern, value, body),
+
             Expr::If(cond, then_branch, else_branch) => {
                 self.infer_if(cond, then_branch, else_branch)
             }
@@ -464,6 +466,34 @@ impl TypeChecker {
             .fold(body_ty, |acc, param| Type::arrow(param, acc));
 
         Ok(func_ty)
+    }
+
+    fn infer_let_expr(
+        &mut self,
+        pattern: &Spanned<Pattern>,
+        value: &Spanned<Expr>,
+        body: &Spanned<Expr>,
+    ) -> Result<Type, TypeError> {
+        // Infer the type of the value
+        let value_ty = self.infer(value)?;
+
+        // Collect bindings from the pattern
+        let mut bindings = Vec::new();
+        self.collect_pattern_bindings(pattern, &value_ty, &mut bindings)?;
+
+        // Extend environment with pattern bindings
+        let old_env = self.env.clone();
+        for (name, scheme) in bindings {
+            self.env.insert(name, scheme);
+        }
+
+        // Infer body type
+        let body_ty = self.infer(body)?;
+
+        // Restore environment
+        self.env = old_env;
+
+        Ok(body_ty)
     }
 
     fn infer_if(
@@ -1260,7 +1290,7 @@ mod tests {
 
     #[test]
     fn infer_match_bool() {
-        let ty = infer("match true | true -> 1 | false -> 0").unwrap();
+        let ty = infer("match true { true -> 1 | false -> 0 }").unwrap();
         assert_eq!(ty, Type::int());
     }
 

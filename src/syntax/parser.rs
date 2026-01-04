@@ -486,6 +486,9 @@ impl Parser {
                 ))
             }
 
+            // Let expression: let p = e1 in e2
+            Some(TokenKind::Let) => self.parse_let_expr(),
+
             // Conditional
             Some(TokenKind::If) => self.parse_if_expr(),
 
@@ -676,7 +679,13 @@ impl Parser {
 
     fn parse_record_field(&mut self) -> Result<(Spanned<String>, Spanned<Expr>), ParseError> {
         let name = self.expect_ident()?;
-        self.expect(TokenKind::Eq)?;
+
+        // Punning: { x } means { x = x }
+        if !self.eat(TokenKind::Eq) {
+            let value = Spanned::new(Expr::Var(name.value.clone()), name.span);
+            return Ok((name, value));
+        }
+
         let value = self.parse_expr()?;
         Ok((name, value))
     }
@@ -779,9 +788,11 @@ impl Parser {
 
     fn parse_match_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
         let start = self.expect(TokenKind::Match)?.span;
-        let scrutinee = self.parse_expr()?;
+        // Use binding power 22 to stop before function application (21)
+        // This prevents `{` from being parsed as a record argument
+        let scrutinee = self.parse_expr_bp(22)?;
 
-        // Note: 'with' keyword is no longer required
+        self.expect(TokenKind::LBrace)?;
 
         // Optional leading |
         self.eat(TokenKind::Bar);
@@ -793,8 +804,8 @@ impl Parser {
             arms.push(self.parse_match_arm()?);
         }
 
-        let end_span = arms.last().map(|a| a.body.span).unwrap_or(start);
-        let span = start.merge(end_span);
+        let end = self.expect(TokenKind::RBrace)?.span;
+        let span = start.merge(end);
 
         Ok(Spanned::new(
             Expr::Match(Box::new(scrutinee), arms),
@@ -853,6 +864,21 @@ impl Parser {
         }
 
         Ok(DoStmt::Expr(expr))
+    }
+
+    fn parse_let_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
+        let start = self.expect(TokenKind::Let)?.span;
+        let pattern = self.parse_pattern()?;
+        self.expect(TokenKind::Eq)?;
+        let value = self.parse_expr()?;
+        self.expect(TokenKind::In)?;
+        let body = self.parse_expr()?;
+
+        let span = start.merge(body.span);
+        Ok(Spanned::new(
+            Expr::Let(pattern, Box::new(value), Box::new(body)),
+            span,
+        ))
     }
 
     fn parse_postfix_expr(&mut self, lhs: Spanned<Expr>) -> Result<Spanned<Expr>, ParseError> {
@@ -1060,8 +1086,8 @@ impl Parser {
             ));
         }
 
-        // Check for | (or pattern)
-        if self.eat(TokenKind::Bar) {
+        // Check for `or` keyword (or pattern)
+        if self.eat(TokenKind::Or) {
             let rhs = self.parse_pattern_inner()?;
             let span = lhs.span.merge(rhs.span);
             return Ok(Spanned::new(
@@ -1282,22 +1308,7 @@ impl Parser {
     }
 
     fn parse_type_app(&mut self) -> Result<Spanned<TypeExpr>, ParseError> {
-        let base = self.parse_atomic_type()?;
-
-        // Type application: 'a list, int option, etc.
-        if let Some(TokenKind::Ident(_)) = self.peek_kind() {
-            let con = self.expect_ident()?;
-            let span = base.span.merge(con.span);
-            return Ok(Spanned::new(
-                TypeExpr::App(
-                    Box::new(Spanned::new(TypeExpr::Con(con.value), con.span)),
-                    vec![base],
-                ),
-                span,
-            ));
-        }
-
-        Ok(base)
+        self.parse_atomic_type()
     }
 
     fn parse_atomic_type(&mut self) -> Result<Spanned<TypeExpr>, ParseError> {
@@ -1309,9 +1320,33 @@ impl Parser {
             }
 
             // Type constructor (lowercase identifier like int, string, list)
+            // May be followed by type arguments: list<int>, map<string, int>
             Some(TokenKind::Ident(name)) => {
                 let token = self.advance();
-                Ok(Spanned::new(TypeExpr::Con(name), token.span))
+                let con_span = token.span;
+
+                // Check for type arguments: <T1, T2, ...>
+                if self.eat(TokenKind::Lt) {
+                    let mut args = Vec::new();
+                    args.push(self.parse_type_expr()?);
+
+                    while self.eat(TokenKind::Comma) {
+                        args.push(self.parse_type_expr()?);
+                    }
+
+                    let end = self.expect(TokenKind::Gt)?.span;
+                    let span = con_span.merge(end);
+
+                    return Ok(Spanned::new(
+                        TypeExpr::App(
+                            Box::new(Spanned::new(TypeExpr::Con(name), con_span)),
+                            args,
+                        ),
+                        span,
+                    ));
+                }
+
+                Ok(Spanned::new(TypeExpr::Con(name), con_span))
             }
 
             // Parenthesized type or tuple type args
@@ -1856,7 +1891,7 @@ mod tests {
 
     #[test]
     fn parse_match_expr() {
-        let expr = parse_expr("match x | Some y -> y | None -> 0").unwrap();
+        let expr = parse_expr("match x { Some y -> y | None -> 0 }").unwrap();
         if let Expr::Match(_, arms) = expr {
             assert_eq!(arms.len(), 2);
         } else {
@@ -2007,7 +2042,7 @@ mod tests {
 
     #[test]
     fn parse_or_pattern() {
-        let pattern = parse_pattern("None | Some _").unwrap();
+        let pattern = parse_pattern("None or Some _").unwrap();
         assert!(matches!(pattern, Pattern::Or(_, _)));
     }
 
@@ -2044,7 +2079,7 @@ mod tests {
 
     #[test]
     fn parse_type_application() {
-        let ty = parse_type("A list").unwrap();
+        let ty = parse_type("list<A>").unwrap();
         assert!(matches!(ty, TypeExpr::App(_, _)));
     }
 
@@ -2227,10 +2262,11 @@ mod tests {
     #[test]
     fn parse_nested_match() {
         let source = r#"
-            match x
-            | Some (Some y) -> y
+            match x {
+              Some (Some y) -> y
             | Some None -> 0
             | None -> 0
+            }
         "#;
         let expr = parse_expr(source).unwrap();
         if let Expr::Match(_, arms) = expr {

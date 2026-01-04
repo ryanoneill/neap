@@ -32,7 +32,7 @@ pub use engine::{CommandResult, EvalResult, ReplEngine};
 pub use harness::ReplTestHarness;
 pub use response::{Response, ResponseKind, TypeDefKind};
 
-use std::io::{self, BufReader, Stdin, Stdout};
+use std::io;
 
 use thiserror::Error;
 
@@ -45,71 +45,7 @@ pub enum ReplError {
 
 /// Run the interactive REPL.
 ///
-/// This is a placeholder that will be replaced with the envision TUI.
-/// For now, it provides a simple stdin/stdout based REPL.
+/// This runs the envision-based TUI REPL with full terminal UI.
 pub fn run() -> Result<(), ReplError> {
-    use std::io::{BufRead, Write};
-
-    let stdin = io::stdin();
-    let stdout = io::stdout();
-    let mut engine: ReplEngine<Stdout, BufReader<Stdin>> =
-        ReplEngine::new(stdout, BufReader::new(stdin));
-
-    println!("Neap REPL v0.1.0");
-    println!("Type :help for help, :quit to exit\n");
-
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
-
-    loop {
-        print!("neap> ");
-        stdout.flush()?;
-
-        let mut line = String::new();
-        if stdin.lock().read_line(&mut line)? == 0 {
-            // EOF
-            println!("\nBye!");
-            break;
-        }
-
-        let line = line.trim();
-
-        if line.is_empty() {
-            continue;
-        }
-
-        // Handle commands
-        if line.starts_with(':') {
-            let result = engine.eval_command(line);
-            match result {
-                CommandResult::Quit => {
-                    println!("Bye!");
-                    break;
-                }
-                CommandResult::Help(text) => println!("{text}"),
-                CommandResult::Cleared => println!("Environment cleared."),
-                CommandResult::TypeOf { ty } => println!("{ty}"),
-                CommandResult::Unknown { cmd } => eprintln!("{cmd}"),
-            }
-            continue;
-        }
-
-        // Evaluate expression or declaration
-        match engine.eval(line) {
-            Ok(Some(result)) => {
-                let response = Response::from_eval_result(result);
-                if !response.is_empty() {
-                    println!("{}", response.text());
-                }
-            }
-            Ok(None) => {
-                eprintln!("Error: incomplete input");
-            }
-            Err(e) => {
-                eprintln!("Error: {e}");
-            }
-        }
-    }
-
-    Ok(())
+    run_tui().map_err(|e| ReplError::Io(io::Error::new(io::ErrorKind::Other, e.to_string())))
 }

@@ -6,7 +6,11 @@
 use std::io::{BufReader, Cursor};
 use std::time::Duration;
 
-use ratatui::crossterm::event::{self, Event};
+use ratatui::crossterm::{
+    event::{self, Event},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use envision::app::{App, Command, Runtime};
 use envision::component::{Component, InputField, InputFieldState, InputMessage, InputOutput};
 use envision::input::{KeyCode, KeyModifiers, SimulatedEvent};
@@ -373,6 +377,23 @@ fn render_input(state: &ReplState, frame: &mut Frame, area: Rect) {
 ///
 /// This is the main entry point for the envision-based REPL.
 pub fn run_tui() -> Result<(), Box<dyn std::error::Error>> {
+    // Set up terminal
+    enable_raw_mode()?;
+    let mut stdout = std::io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+
+    // Run the REPL, capturing any errors
+    let result = run_tui_inner();
+
+    // Restore terminal (always, even on error)
+    let _ = disable_raw_mode();
+    let _ = execute!(stdout, LeaveAlternateScreen);
+
+    result
+}
+
+/// Inner REPL loop, separated so we can ensure terminal cleanup.
+fn run_tui_inner() -> Result<(), Box<dyn std::error::Error>> {
     // Create the engine (can't be in state due to Clone requirement)
     let mut engine: ReplEngine<Vec<u8>, BufReader<Cursor<Vec<u8>>>> =
         ReplEngine::new(Vec::new(), BufReader::new(Cursor::new(Vec::new())));

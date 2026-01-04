@@ -210,8 +210,8 @@ impl TypeChecker {
         // Infer body type
         let body_ty = self.infer(&clause.body)?;
 
-        // Unify with return type
-        let s = unify(&ret_ty, &body_ty)?;
+        // Unify with return type (apply current substitution first)
+        let s = unify(&self.subst.apply(&ret_ty), &body_ty)?;
         self.subst.extend(&s);
 
         // Check result type annotation if present
@@ -1318,6 +1318,19 @@ mod tests {
     fn check_fun_recursive() {
         let result = check("fun fact n = if n = 0 then 1 else n * fact (n - 1)");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_fun_recursive_type() {
+        TypeVar::reset_counter();
+        let mut parser = Parser::new("fun fact n = if n = 0 then 1 else n * fact (n - 1)").unwrap();
+        let program = parser.parse_program().unwrap();
+        let mut checker = TypeChecker::new();
+        checker.check_program(&program).unwrap();
+
+        // After checking, the function should have type int -> int
+        let ty = checker.lookup_type("fact").unwrap();
+        assert_eq!(ty, Type::arrow(Type::int(), Type::int()));
     }
 
     #[test]

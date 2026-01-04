@@ -58,6 +58,17 @@ async fn test_recursive_function() {
 }
 
 #[tokio::test]
+async fn test_recursive_function_type() {
+    let mut repl = ReplTestHarness::new();
+    let r = repl
+        .input("fun fact n = if n = 0 then 1 else n * fact (n - 1)")
+        .await;
+
+    // The type should be int -> int, not int -> 'tN
+    assert_eq!(r.type_str(), Some("int -> int"));
+}
+
+#[tokio::test]
 async fn test_type_error() {
     let mut repl = ReplTestHarness::new();
     let r = repl.input("1 + true").await;

@@ -203,15 +203,11 @@ impl Parser {
     fn parse_type_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
         let start = self.expect(TokenKind::Type)?.span;
 
-        let mut params = Vec::new();
-
-        // Parse type parameters
-        while let Some(TokenKind::TyVar(name)) = self.peek_kind().cloned() {
-            let span = self.advance().span;
-            params.push(Spanned::new(name, span));
-        }
-
         let name = self.expect_ident()?;
+
+        // Parse optional type parameters <A, B, C>
+        let params = self.parse_type_params()?;
+
         self.expect(TokenKind::Eq)?;
         let ty = self.parse_type()?;
 
@@ -225,15 +221,11 @@ impl Parser {
     fn parse_datatype_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
         let start = self.expect(TokenKind::Datatype)?.span;
 
-        let mut params = Vec::new();
-
-        // Parse type parameters
-        while let Some(TokenKind::TyVar(name)) = self.peek_kind().cloned() {
-            let span = self.advance().span;
-            params.push(Spanned::new(name, span));
-        }
-
         let name = self.expect_ident()?;
+
+        // Parse optional type parameters <A, B, C>
+        let params = self.parse_type_params()?;
+
         self.expect(TokenKind::Eq)?;
 
         // Optional leading |
@@ -265,13 +257,46 @@ impl Parser {
     fn parse_constructor(&mut self) -> Result<Constructor, ParseError> {
         let name = self.expect_upper_ident()?;
 
-        let arg = if self.eat(TokenKind::Of) {
-            Some(self.parse_type()?)
+        // Constructor argument follows directly (no 'of' keyword)
+        // Check if next token can start a type
+        let arg = if self.peek_kind().is_some_and(|k| self.can_start_type(k)) {
+            Some(self.parse_atomic_type()?)
         } else {
             None
         };
 
         Ok(Constructor { name, arg })
+    }
+
+    /// Parse optional type parameters: <A, B, C>
+    fn parse_type_params(&mut self) -> Result<Vec<Spanned<String>>, ParseError> {
+        let mut params = Vec::new();
+
+        if !self.eat(TokenKind::Lt) {
+            return Ok(params);
+        }
+
+        // Parse first type parameter (required after <)
+        params.push(self.expect_upper_ident()?);
+
+        // Parse remaining parameters
+        while self.eat(TokenKind::Comma) {
+            params.push(self.expect_upper_ident()?);
+        }
+
+        self.expect(TokenKind::Gt)?;
+        Ok(params)
+    }
+
+    /// Check if a token kind can start a type expression
+    fn can_start_type(&self, kind: &TokenKind) -> bool {
+        matches!(
+            kind,
+            TokenKind::UpperIdent(_)
+                | TokenKind::Ident(_)
+                | TokenKind::LParen
+                | TokenKind::LBrace
+        )
     }
 
     /// Parse a trait declaration.
@@ -1291,13 +1316,13 @@ impl Parser {
 
     fn parse_atomic_type(&mut self) -> Result<Spanned<TypeExpr>, ParseError> {
         match self.peek_kind().cloned() {
-            // Type variable
-            Some(TokenKind::TyVar(name)) => {
+            // Type variable (uppercase single letter or uppercase identifier)
+            Some(TokenKind::UpperIdent(name)) => {
                 let token = self.advance();
                 Ok(Spanned::new(TypeExpr::Var(name), token.span))
             }
 
-            // Type constructor
+            // Type constructor (lowercase identifier like int, string, list)
             Some(TokenKind::Ident(name)) => {
                 let token = self.advance();
                 Ok(Spanned::new(TypeExpr::Con(name), token.span))
@@ -1625,7 +1650,7 @@ mod tests {
     #[test]
     fn parse_char_literal() {
         assert!(matches!(
-            parse_expr(r#"#"a""#),
+            parse_expr("'a'"),
             Ok(Expr::Lit(Literal::Char('a')))
         ));
     }
@@ -2023,8 +2048,8 @@ mod tests {
 
     #[test]
     fn parse_type_var() {
-        let ty = parse_type("'a").unwrap();
-        assert!(matches!(ty, TypeExpr::Var(name) if name == "a"));
+        let ty = parse_type("A").unwrap();
+        assert!(matches!(ty, TypeExpr::Var(name) if name == "A"));
     }
 
     #[test]
@@ -2052,7 +2077,7 @@ mod tests {
 
     #[test]
     fn parse_type_application() {
-        let ty = parse_type("'a list").unwrap();
+        let ty = parse_type("A list").unwrap();
         assert!(matches!(ty, TypeExpr::App(_, _)));
     }
 
@@ -2107,11 +2132,12 @@ mod tests {
 
     #[test]
     fn parse_datatype_decl() {
-        let program = parse_program("datatype 'a option = None | Some of 'a").unwrap();
+        let program = parse_program("datatype option<A> = None | Some A").unwrap();
         assert_eq!(program.decls.len(), 1);
         if let Decl::Datatype(dt) = &program.decls[0].value {
             assert_eq!(dt.name.value, "option");
             assert_eq!(dt.params.len(), 1);
+            assert_eq!(dt.params[0].value, "A");
             assert_eq!(dt.constructors.len(), 2);
         } else {
             panic!("Expected Datatype");

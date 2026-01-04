@@ -170,15 +170,13 @@ pub enum TokenKind {
     Float(f64),
     /// String literal (e.g., `"hello"`)
     String(String),
-    /// Character literal (e.g., `#"a"`)
+    /// Character literal (e.g., `'a'`)
     Char(char),
 
     // ========== Identifiers ==========
     /// Identifier (e.g., `foo`, `myFunc`)
     Ident(String),
-    /// Type variable (e.g., `'a`, `'key`)
-    TyVar(String),
-    /// Uppercase identifier (for constructors, e.g., `Some`, `None`)
+    /// Uppercase identifier (for constructors and type variables, e.g., `Some`, `None`, `T`)
     UpperIdent(String),
 
     // ========== Special ==========
@@ -386,7 +384,6 @@ impl TokenKind {
             Self::String(_) => "string",
             Self::Char(_) => "char",
             Self::Ident(_) => "identifier",
-            Self::TyVar(_) => "type variable",
             Self::UpperIdent(_) => "constructor",
             Self::Eof => "end of file",
         }

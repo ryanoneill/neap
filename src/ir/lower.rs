@@ -1808,11 +1808,11 @@ mod tests {
 
     #[test]
     fn lower_show_char() {
-        let ir = lower_program("let s = show #\"a\"").expect("lower error");
+        let ir = lower_program("let s = show 'a'").expect("lower error");
 
         match &ir.decls[0] {
             IRDecl::Val { value, .. } => {
-                // show #"a" should become charToString #"a"
+                // show 'a' should become charToString 'a'
                 assert!(matches!(value, IRExpr::Prim { op: Primitive::CharToString, .. }));
             }
             _ => panic!("expected val decl"),

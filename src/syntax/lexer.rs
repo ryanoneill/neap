@@ -117,9 +117,9 @@ impl<'src> Lexer<'src> {
             return Ok(self.lex_identifier());
         }
 
-        // Type variables ('a, 'key, etc.)
+        // Character literals ('a', '\n')
         if first == '\'' {
-            return Ok(self.lex_type_var());
+            return self.lex_char();
         }
 
         // Numbers
@@ -130,11 +130,6 @@ impl<'src> Lexer<'src> {
         // String literals
         if first == '"' {
             return self.lex_string();
-        }
-
-        // Character literals (#"a")
-        if first == '#' && self.peek_char_at(1) == Some('"') {
-            return self.lex_char();
         }
 
         // Operators and punctuation
@@ -221,24 +216,6 @@ impl<'src> Lexer<'src> {
         };
 
         Token::new(kind, span)
-    }
-
-    /// Lex a type variable ('a, 'key, etc.).
-    fn lex_type_var(&mut self) -> Token {
-        let start = self.pos;
-        self.advance(); // skip '
-
-        let mut name = String::new();
-        while let Some(ch) = self.peek_char() {
-            if ch.is_ascii_alphanumeric() || ch == '_' {
-                name.push(ch);
-                self.advance();
-            } else {
-                break;
-            }
-        }
-
-        Token::new(TokenKind::TyVar(name), Span::new(start, self.pos))
     }
 
     /// Lex a number (integer or float).
@@ -543,15 +520,14 @@ impl<'src> Lexer<'src> {
         ))
     }
 
-    /// Lex a character literal (#"a").
+    /// Lex a character literal ('a', '\n').
     fn lex_char(&mut self) -> Result<Token, LexerError> {
         let start = self.pos;
-        self.advance(); // skip #
-        self.advance(); // skip opening "
+        self.advance(); // skip opening '
 
         let ch = match self.peek_char() {
             None => return Err(LexerError::UnterminatedChar { start }),
-            Some('"') => return Err(LexerError::EmptyCharLiteral { pos: start }),
+            Some('\'') => return Err(LexerError::EmptyCharLiteral { pos: start }),
             Some('\\') => {
                 self.advance();
                 self.lex_escape_sequence()?
@@ -563,7 +539,7 @@ impl<'src> Lexer<'src> {
         };
 
         match self.peek_char() {
-            Some('"') => {
+            Some('\'') => {
                 self.advance();
             }
             Some(_) => return Err(LexerError::MultiCharLiteral { pos: start }),
@@ -855,14 +831,14 @@ mod tests {
     }
 
     #[test]
-    fn type_variables() {
-        let tokens = token_kinds("'a 'key 'T").unwrap();
+    fn char_literals_new_syntax() {
+        let tokens = token_kinds("'a' 'Z' '0'").unwrap();
         assert_eq!(
             tokens,
             vec![
-                TokenKind::TyVar("a".to_string()),
-                TokenKind::TyVar("key".to_string()),
-                TokenKind::TyVar("T".to_string()),
+                TokenKind::Char('a'),
+                TokenKind::Char('Z'),
+                TokenKind::Char('0'),
                 TokenKind::Eof,
             ]
         );
@@ -994,7 +970,7 @@ mod tests {
 
     #[test]
     fn char_literals() {
-        let tokens = token_kinds(r#"#"a" #"Z" #"0""#).unwrap();
+        let tokens = token_kinds("'a' 'Z' '0'").unwrap();
         assert_eq!(
             tokens,
             vec![
@@ -1008,7 +984,7 @@ mod tests {
 
     #[test]
     fn char_escapes() {
-        let tokens = token_kinds(r#"#"\n" #"\t" #"\\""#).unwrap();
+        let tokens = token_kinds(r"'\n' '\t' '\\'").unwrap();
         assert_eq!(
             tokens,
             vec![
@@ -1286,19 +1262,20 @@ mod tests {
 
     #[test]
     fn datatype_definition() {
-        let tokens = token_kinds("datatype 'a option = None | Some of 'a").unwrap();
+        let tokens = token_kinds("datatype option<A> = None | Some A").unwrap();
         assert_eq!(
             tokens,
             vec![
                 TokenKind::Datatype,
-                TokenKind::TyVar("a".to_string()),
                 TokenKind::Ident("option".to_string()),
+                TokenKind::Lt,
+                TokenKind::UpperIdent("A".to_string()),
+                TokenKind::Gt,
                 TokenKind::Eq,
                 TokenKind::UpperIdent("None".to_string()),
                 TokenKind::Bar,
                 TokenKind::UpperIdent("Some".to_string()),
-                TokenKind::Of,
-                TokenKind::TyVar("a".to_string()),
+                TokenKind::UpperIdent("A".to_string()),
                 TokenKind::Eof,
             ]
         );
@@ -1332,13 +1309,13 @@ mod tests {
 
     #[test]
     fn empty_char_literal() {
-        let result = token_kinds(r#"#"""#);
+        let result = token_kinds("''");
         assert!(matches!(result, Err(LexerError::EmptyCharLiteral { .. })));
     }
 
     #[test]
     fn multi_char_literal() {
-        let result = token_kinds(r#"#"ab""#);
+        let result = token_kinds("'ab'");
         assert!(matches!(result, Err(LexerError::MultiCharLiteral { .. })));
     }
 

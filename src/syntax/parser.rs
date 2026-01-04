@@ -1316,18 +1316,7 @@ impl Parser {
             ));
         }
 
-        // Tuple type: ty1 * ty2 * ...
-        if self.eat(TokenKind::Star) {
-            let mut elements = vec![lhs];
-            elements.push(self.parse_type_app()?);
-
-            while self.eat(TokenKind::Star) {
-                elements.push(self.parse_type_app()?);
-            }
-
-            let span = elements.first().unwrap().span.merge(elements.last().unwrap().span);
-            return Ok(Spanned::new(TypeExpr::Tuple(elements), span));
-        }
+        // Note: Tuple types are now (ty1, ty2) not ty1 * ty2
 
         Ok(lhs)
     }
@@ -1396,28 +1385,19 @@ impl Parser {
 
         let first = self.parse_type_expr()?;
 
-        // Multiple type args: (ty1, ty2) con
+        // Tuple type: (ty1, ty2, ...)
         if self.eat(TokenKind::Comma) {
-            let mut args = vec![first];
-            args.push(self.parse_type_expr()?);
+            let mut elements = vec![first];
+            elements.push(self.parse_type_expr()?);
 
             while self.eat(TokenKind::Comma) {
-                args.push(self.parse_type_expr()?);
+                elements.push(self.parse_type_expr()?);
             }
 
-            self.expect(TokenKind::RParen)?;
+            let end = self.expect(TokenKind::RParen)?.span;
+            let span = start.merge(end);
 
-            // Expect constructor name after multi-arg type
-            let con = self.expect_ident()?;
-            let span = start.merge(con.span);
-
-            return Ok(Spanned::new(
-                TypeExpr::App(
-                    Box::new(Spanned::new(TypeExpr::Con(con.value), con.span)),
-                    args,
-                ),
-                span,
-            ));
+            return Ok(Spanned::new(TypeExpr::Tuple(elements), span));
         }
 
         // Parenthesized type
@@ -2120,7 +2100,7 @@ mod tests {
 
     #[test]
     fn parse_tuple_type() {
-        let ty = parse_type("int * string * bool").unwrap();
+        let ty = parse_type("(int, string, bool)").unwrap();
         if let TypeExpr::Tuple(elements) = ty {
             assert_eq!(elements.len(), 3);
         } else {

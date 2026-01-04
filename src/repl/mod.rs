@@ -4,6 +4,7 @@
 //! - `ReplEngine`: Core evaluation logic separated from UI
 //! - `ReplTestHarness`: Async API for programmatic testing
 //! - `Response`: Structured response type for inspecting results
+//! - `NeapReplApp`: Envision-based TUI application
 //!
 //! # Testing Example
 //!
@@ -18,6 +19,7 @@
 //! }
 //! ```
 
+mod app;
 mod engine;
 mod harness;
 mod response;
@@ -25,6 +27,7 @@ mod response;
 #[cfg(test)]
 mod tests;
 
+pub use app::{run_tui, HistoryEntry, NeapReplApp, ReplMsg, ReplState};
 pub use engine::{CommandResult, EvalResult, ReplEngine};
 pub use harness::ReplTestHarness;
 pub use response::{Response, ResponseKind, TypeDefKind};

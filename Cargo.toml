@@ -13,7 +13,13 @@ thiserror = "2.0"
 # Error reporting with nice diagnostics
 ariadne = "0.4"
 
-# Line editing for REPL
+# TUI framework with headless testing support
+envision = "0.3"
+
+# TUI widgets (for Block, Borders, Paragraph)
+ratatui = "0.29"
+
+# Line editing for REPL (keeping as fallback)
 rustyline = "15"
 
 [dev-dependencies]

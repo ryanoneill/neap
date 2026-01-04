@@ -4,7 +4,9 @@
 //! which provides a TEA (The Elm Architecture) pattern for TUI development.
 
 use std::io::{BufReader, Cursor};
+use std::time::Duration;
 
+use ratatui::crossterm::event::{self, Event};
 use envision::app::{App, Command, Runtime};
 use envision::component::{Component, InputField, InputFieldState, InputMessage, InputOutput};
 use envision::input::{KeyCode, KeyModifiers, SimulatedEvent};
@@ -390,6 +392,16 @@ pub fn run_tui() -> Result<(), Box<dyn std::error::Error>> {
             // Process the command if any
             if !cmd.is_none() {
                 // Commands would be handled here if needed
+            }
+        }
+
+        // Poll for crossterm events and push to runtime queue
+        if event::poll(Duration::from_millis(50))? {
+            if let Event::Key(key_event) = event::read()? {
+                // Only process key press events (not release or repeat)
+                if key_event.kind == event::KeyEventKind::Press {
+                    runtime.events().push(SimulatedEvent::Key(key_event));
+                }
             }
         }
 

@@ -1340,20 +1340,20 @@ mod tests {
 
     #[test]
     fn check_fun() {
-        let result = check("fun add x y = x + y");
+        let result = check("fn add x y = x + y");
         assert!(result.is_ok());
     }
 
     #[test]
     fn check_fun_recursive() {
-        let result = check("fun fact n = if n == 0 then 1 else n * fact (n - 1)");
+        let result = check("fn fact n = if n == 0 then 1 else n * fact (n - 1)");
         assert!(result.is_ok());
     }
 
     #[test]
     fn check_fun_recursive_type() {
         TypeVar::reset_counter();
-        let mut parser = Parser::new("fun fact n = if n == 0 then 1 else n * fact (n - 1)").unwrap();
+        let mut parser = Parser::new("fn fact n = if n == 0 then 1 else n * fact (n - 1)").unwrap();
         let program = parser.parse_program().unwrap();
         let mut checker = TypeChecker::new();
         checker.check_program(&program).unwrap();
@@ -1369,7 +1369,7 @@ mod tests {
             r#"
             let x = 1
             let y = x + 1
-            fun double n = n * 2
+            fn double n = n * 2
         "#,
         );
         assert!(result.is_ok());

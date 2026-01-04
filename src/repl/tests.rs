@@ -39,7 +39,7 @@ async fn test_variable_persistence() {
 #[tokio::test]
 async fn test_function_definition() {
     let mut repl = ReplTestHarness::new();
-    let r = repl.input("fun double n = n * 2").await;
+    let r = repl.input("fn double n = n * 2").await;
     assert!(r.is_function());
     assert_eq!(r.binding_name(), Some("double"));
 
@@ -50,7 +50,7 @@ async fn test_function_definition() {
 #[tokio::test]
 async fn test_recursive_function() {
     let mut repl = ReplTestHarness::new();
-    repl.input("fun fact n = if n == 0 then 1 else n * fact (n - 1)")
+    repl.input("fn fact n = if n == 0 then 1 else n * fact (n - 1)")
         .await;
 
     let r = repl.input("fact 5").await;
@@ -61,7 +61,7 @@ async fn test_recursive_function() {
 async fn test_recursive_function_type() {
     let mut repl = ReplTestHarness::new();
     let r = repl
-        .input("fun fact n = if n == 0 then 1 else n * fact (n - 1)")
+        .input("fn fact n = if n == 0 then 1 else n * fact (n - 1)")
         .await;
 
     // The type should be int -> int, not int -> 'tN
@@ -213,8 +213,8 @@ async fn test_lambda() {
 #[tokio::test]
 async fn test_pipe() {
     let mut repl = ReplTestHarness::new();
-    repl.input("fun add1 x = x + 1").await;
-    repl.input("fun mul2 x = x * 2").await;
+    repl.input("fn add1 x = x + 1").await;
+    repl.input("fn mul2 x = x * 2").await;
 
     let r = repl.input("5 |> add1 |> mul2").await;
     eprintln!("Pipe result: {}, is_error: {}", r.text(), r.is_error());

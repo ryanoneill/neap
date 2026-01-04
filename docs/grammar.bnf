@@ -8,7 +8,6 @@ program     ::= { decl }
 decl        ::= val_decl
               | fun_decl
               | type_decl
-              | datatype_decl
               | trait_decl
               | impl_decl
 
@@ -16,11 +15,12 @@ decl        ::= val_decl
 
 val_decl    ::= "let" [ "rec" ] pattern [ ":" type ] "=" expr
 
-fun_decl    ::= "fun" IDENT { atomic_pattern } [ ":" type ] "=" expr
+fun_decl    ::= "fn" IDENT { atomic_pattern } [ ":" type ] "=" expr
 
-type_decl   ::= "type" IDENT [ type_params ] "=" type
+type_decl   ::= "type" IDENT [ type_params ] "=" type_rhs
 
-datatype_decl ::= "datatype" IDENT [ type_params ] "=" [ "|" ] constructor { "|" constructor }
+type_rhs    ::= type                           (* type alias: type point = { x: int, y: int } *)
+              | [ "|" ] constructor { "|" constructor }  (* ADT: type option<A> = None | Some A *)
 
 type_params ::= "<" UPPER_IDENT { "," UPPER_IDENT } ">"
 
@@ -160,7 +160,7 @@ char        ::= (* any character except \ and the delimiter *)
 (* ========== Keywords ========== *)
 
 (* Reserved words that cannot be used as identifiers:
-   let, rec, in, fun, or, match, datatype, type, if, then, else,
+   let, rec, in, fn, or, match, type, if, then, else,
    do, end, true, false, trait, impl, for
 *)
 

@@ -731,14 +731,13 @@ mod tests {
 
     #[test]
     fn keywords() {
-        let tokens = token_kinds("let in fn fun rec or match").unwrap();
+        let tokens = token_kinds("let in fn rec or match").unwrap();
         assert_eq!(
             tokens,
             vec![
                 TokenKind::Let,
                 TokenKind::In,
                 TokenKind::Fn,
-                TokenKind::Fun,
                 TokenKind::Rec,
                 TokenKind::Or,
                 TokenKind::Match,
@@ -749,11 +748,10 @@ mod tests {
 
     #[test]
     fn more_keywords() {
-        let tokens = token_kinds("datatype type if then else do end true false").unwrap();
+        let tokens = token_kinds("type if then else do end true false").unwrap();
         assert_eq!(
             tokens,
             vec![
-                TokenKind::Datatype,
                 TokenKind::Type,
                 TokenKind::If,
                 TokenKind::Then,
@@ -1262,12 +1260,12 @@ mod tests {
     }
 
     #[test]
-    fn datatype_definition() {
-        let tokens = token_kinds("datatype option<A> = None | Some A").unwrap();
+    fn type_adt_definition() {
+        let tokens = token_kinds("type option<A> = None | Some A").unwrap();
         assert_eq!(
             tokens,
             vec![
-                TokenKind::Datatype,
+                TokenKind::Type,
                 TokenKind::Ident("option".to_string()),
                 TokenKind::Lt,
                 TokenKind::UpperIdent("A".to_string()),

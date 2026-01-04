@@ -98,15 +98,14 @@ impl Parser {
     pub fn parse_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
         match self.peek_kind() {
             Some(TokenKind::Let) => self.parse_let_decl(),
-            Some(TokenKind::Fun) => self.parse_fun_decl(),
-            Some(TokenKind::Type) => self.parse_type_decl(),
-            Some(TokenKind::Datatype) => self.parse_datatype_decl(),
+            Some(TokenKind::Fn) => self.parse_fun_decl(),
+            Some(TokenKind::Type) => self.parse_type_or_datatype_decl(),
             Some(TokenKind::Trait) => self.parse_trait_decl(),
             Some(TokenKind::Impl) => self.parse_impl_decl(),
             Some(_) => {
                 let token = self.peek().unwrap();
                 Err(ParseError::UnexpectedToken {
-                    expected: "declaration (let, fun, type, datatype, trait, or impl)"
+                    expected: "declaration (let, fn, type, trait, or impl)"
                         .to_string(),
                     found: token.kind.name().to_string(),
                     span: token.span,
@@ -147,7 +146,7 @@ impl Parser {
     }
 
     fn parse_fun_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
-        let start = self.expect(TokenKind::Fun)?.span;
+        let start = self.expect(TokenKind::Fn)?.span;
         let name = self.expect_ident()?;
 
         // Single clause only - use match expressions for pattern matching
@@ -188,7 +187,10 @@ impl Parser {
         })
     }
 
-    fn parse_type_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
+    /// Parse a type declaration (alias or ADT).
+    /// - Type alias: `type point = { x: int, y: int }`
+    /// - ADT: `type option<A> = None | Some A`
+    fn parse_type_or_datatype_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
         let start = self.expect(TokenKind::Type)?.span;
 
         let name = self.expect_ident()?;
@@ -197,49 +199,48 @@ impl Parser {
         let params = self.parse_type_params()?;
 
         self.expect(TokenKind::Eq)?;
-        let ty = self.parse_type()?;
 
-        let span = start.merge(ty.span);
-        Ok(Spanned::new(
-            Decl::Type(TypeDecl { params, name, ty }),
-            span,
-        ))
-    }
+        // Determine if this is an ADT or a type alias
+        // ADT: starts with `|` or UpperIdent (constructor)
+        // Type alias: starts with lowercase ident, `(`, `{`, etc.
+        let is_adt = matches!(self.peek_kind(), Some(TokenKind::Bar) | Some(TokenKind::UpperIdent(_)));
 
-    fn parse_datatype_decl(&mut self) -> Result<Spanned<Decl>, ParseError> {
-        let start = self.expect(TokenKind::Datatype)?.span;
+        if is_adt {
+            // Parse as ADT
+            // Optional leading |
+            self.eat(TokenKind::Bar);
 
-        let name = self.expect_ident()?;
-
-        // Parse optional type parameters <A, B, C>
-        let params = self.parse_type_params()?;
-
-        self.expect(TokenKind::Eq)?;
-
-        // Optional leading |
-        self.eat(TokenKind::Bar);
-
-        let mut constructors = Vec::new();
-        constructors.push(self.parse_constructor()?);
-
-        while self.eat(TokenKind::Bar) {
+            let mut constructors = Vec::new();
             constructors.push(self.parse_constructor()?);
+
+            while self.eat(TokenKind::Bar) {
+                constructors.push(self.parse_constructor()?);
+            }
+
+            let end_span = constructors
+                .last()
+                .map(|c| c.arg.as_ref().map(|a| a.span).unwrap_or(c.name.span))
+                .unwrap_or(name.span);
+            let span = start.merge(end_span);
+
+            Ok(Spanned::new(
+                Decl::Datatype(DatatypeDecl {
+                    params,
+                    name,
+                    constructors,
+                }),
+                span,
+            ))
+        } else {
+            // Parse as type alias
+            let ty = self.parse_type()?;
+
+            let span = start.merge(ty.span);
+            Ok(Spanned::new(
+                Decl::Type(TypeDecl { params, name, ty }),
+                span,
+            ))
         }
-
-        let end_span = constructors
-            .last()
-            .map(|c| c.arg.as_ref().map(|a| a.span).unwrap_or(c.name.span))
-            .unwrap_or(name.span);
-        let span = start.merge(end_span);
-
-        Ok(Spanned::new(
-            Decl::Datatype(DatatypeDecl {
-                params,
-                name,
-                constructors,
-            }),
-            span,
-        ))
     }
 
     fn parse_constructor(&mut self) -> Result<Constructor, ParseError> {
@@ -2114,7 +2115,7 @@ mod tests {
 
     #[test]
     fn parse_fun_decl() {
-        let program = parse_program("fun add x y = x + y").unwrap();
+        let program = parse_program("fn add x y = x + y").unwrap();
         assert_eq!(program.decls.len(), 1);
         if let Decl::Fun(fun) = &program.decls[0].value {
             assert_eq!(fun.name.value, "add");
@@ -2134,7 +2135,7 @@ mod tests {
 
     #[test]
     fn parse_datatype_decl() {
-        let program = parse_program("datatype option<A> = None | Some A").unwrap();
+        let program = parse_program("type option<A> = None | Some A").unwrap();
         assert_eq!(program.decls.len(), 1);
         if let Decl::Datatype(dt) = &program.decls[0].value {
             assert_eq!(dt.name.value, "option");
@@ -2251,7 +2252,7 @@ mod tests {
         let source = r#"
             let x = 1
             let y = 2
-            fun add a b = a + b
+            fn add a b = a + b
         "#;
         let program = parse_program(source).unwrap();
         assert_eq!(program.decls.len(), 3);

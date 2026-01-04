@@ -115,7 +115,7 @@ impl Response {
     fn function(name: &str, ty: Type) -> Self {
         let ty_str = ty.to_string();
         Self {
-            text: format!("fun {name} : {ty_str}"),
+            text: format!("fn {name} : {ty_str}"),
             kind: ResponseKind::Function {
                 name: name.to_string(),
                 ty: ty_str,

@@ -30,19 +30,15 @@ pub enum TokenKind {
     Let,
     /// `in` - let...in expression body
     In,
-    /// `fn` - method signature in traits
+    /// `fn` - function declaration and method signature
     Fn,
-    /// `fun` - named function
-    Fun,
     /// `rec` - recursive binding
     Rec,
     /// `match` - pattern matching
     Match,
     /// `or` - or-pattern in match arms
     Or,
-    /// `datatype` - algebraic data type
-    Datatype,
-    /// `type` - type alias
+    /// `type` - type alias or algebraic data type
     Type,
     /// `if` - conditional
     If,
@@ -187,11 +183,9 @@ impl TokenKind {
             Self::Let
                 | Self::In
                 | Self::Fn
-                | Self::Fun
                 | Self::Rec
                 | Self::Match
                 | Self::Or
-                | Self::Datatype
                 | Self::Type
                 | Self::If
                 | Self::Then
@@ -275,11 +269,9 @@ impl TokenKind {
             "let" => Some(Self::Let),
             "in" => Some(Self::In),
             "fn" => Some(Self::Fn),
-            "fun" => Some(Self::Fun),
             "rec" => Some(Self::Rec),
             "match" => Some(Self::Match),
             "or" => Some(Self::Or),
-            "datatype" => Some(Self::Datatype),
             "type" => Some(Self::Type),
             "if" => Some(Self::If),
             "then" => Some(Self::Then),
@@ -302,11 +294,9 @@ impl TokenKind {
             Self::Let => "let",
             Self::In => "in",
             Self::Fn => "fn",
-            Self::Fun => "fun",
             Self::Rec => "rec",
             Self::Match => "match",
             Self::Or => "or",
-            Self::Datatype => "datatype",
             Self::Type => "type",
             Self::If => "if",
             Self::Then => "then",

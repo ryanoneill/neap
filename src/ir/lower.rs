@@ -1668,7 +1668,7 @@ mod tests {
 
     #[test]
     fn lower_fun() {
-        let ir = lower_program("fun add x y = x + y").expect("lower error");
+        let ir = lower_program("fn add x y = x + y").expect("lower error");
 
         match &ir.decls[0] {
             IRDecl::Fun { name, params, .. } => {
@@ -1792,7 +1792,7 @@ mod tests {
 
     #[test]
     fn lower_pipe() {
-        let ir = lower_program("fun f x = x + 1\nlet y = 1 |> f").expect("lower error");
+        let ir = lower_program("fn f x = x + 1\nlet y = 1 |> f").expect("lower error");
 
         match &ir.decls[1] {
             IRDecl::Val { value, .. } => {

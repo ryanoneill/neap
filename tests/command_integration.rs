@@ -43,7 +43,7 @@ fn test_simple_command() {
     // Just run a command - verify we can capture and store result
     let source = r#"
         let result = `echo hello`
-        fun getOut x = result.stdout
+        fn getOut x = result.stdout
         let out = getOut 1
         let p = print out
     "#;

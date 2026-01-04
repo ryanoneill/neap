@@ -771,8 +771,9 @@ mod tests {
     }
 
     #[test]
-    fn keyword_operators() {
-        let tokens = token_kinds("andalso orelse not").unwrap();
+    fn logical_operator_symbols() {
+        // Test operator symbols (andalso/orelse/not are no longer keywords)
+        let tokens = token_kinds("&& || !").unwrap();
         assert_eq!(
             tokens,
             vec![

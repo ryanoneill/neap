@@ -144,7 +144,7 @@ async fn test_boolean_operations() {
     let r = repl.input("true || false").await;
     assert_eq!(r.value_str(), Some("true"));
 
-    let r = repl.input("not true").await;
+    let r = repl.input("!true").await;
     assert_eq!(r.value_str(), Some("false"));
 }
 

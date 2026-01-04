@@ -118,11 +118,11 @@ pub enum TokenKind {
     ColonColon,
     /// `@` - list append
     At,
-    /// `&&` or `andalso` - logical and
+    /// `&&` - logical and
     AndAlso,
-    /// `||` or `orelse` - logical or
+    /// `||` - logical or
     OrElse,
-    /// `!` or `not` - logical negation / reference dereference
+    /// `!` - logical negation / reference dereference
     Bang,
     /// `:=` - reference assignment
     ColonEq,
@@ -301,9 +301,6 @@ impl TokenKind {
             "end" => Some(Self::End),
             "true" => Some(Self::True),
             "false" => Some(Self::False),
-            "andalso" => Some(Self::AndAlso),
-            "orelse" => Some(Self::OrElse),
-            "not" => Some(Self::Bang),
             "trait" => Some(Self::Trait),
             "impl" => Some(Self::Impl),
             "for" => Some(Self::For),
@@ -358,8 +355,8 @@ impl TokenKind {
             Self::Caret => "^",
             Self::ColonColon => "::",
             Self::At => "@",
-            Self::AndAlso => "andalso",
-            Self::OrElse => "orelse",
+            Self::AndAlso => "&&",
+            Self::OrElse => "||",
             Self::Bang => "!",
             Self::ColonEq => ":=",
             Self::Arrow => "->",
@@ -425,10 +422,11 @@ mod tests {
         assert_eq!(TokenKind::keyword_from_str("let"), Some(TokenKind::Let));
         assert_eq!(TokenKind::keyword_from_str("match"), Some(TokenKind::Match));
         assert_eq!(TokenKind::keyword_from_str("true"), Some(TokenKind::True));
-        assert_eq!(
-            TokenKind::keyword_from_str("andalso"),
-            Some(TokenKind::AndAlso)
-        );
+        assert_eq!(TokenKind::keyword_from_str("trait"), Some(TokenKind::Trait));
+        // andalso, orelse, not are no longer keywords
+        assert_eq!(TokenKind::keyword_from_str("andalso"), None);
+        assert_eq!(TokenKind::keyword_from_str("orelse"), None);
+        assert_eq!(TokenKind::keyword_from_str("not"), None);
         assert_eq!(TokenKind::keyword_from_str("foo"), None);
         assert_eq!(TokenKind::keyword_from_str("Let"), None); // Case sensitive
     }

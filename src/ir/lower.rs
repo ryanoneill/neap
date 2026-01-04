@@ -1728,7 +1728,7 @@ mod tests {
 
     #[test]
     fn lower_not() {
-        let ir = lower_program("let b = not true").expect("lower error");
+        let ir = lower_program("let b = !true").expect("lower error");
 
         match &ir.decls[0] {
             IRDecl::Val { value, .. } => {

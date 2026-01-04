@@ -1037,7 +1037,7 @@ mod tests {
 
     #[test]
     fn optimize_constant_not() {
-        let ir = lower_and_optimize("let b = not true");
+        let ir = lower_and_optimize("let b = !true");
 
         match &ir.decls[0] {
             IRDecl::Val { value, .. } => {

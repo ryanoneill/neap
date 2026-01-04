@@ -504,9 +504,6 @@ impl Parser {
             // Match expression
             Some(TokenKind::Match) => self.parse_match_expr(),
 
-            // Case expression (alternative syntax)
-            Some(TokenKind::Case) => self.parse_case_expr(),
-
             // Do block
             Some(TokenKind::Do) => self.parse_do_expr(),
 
@@ -797,31 +794,6 @@ impl Parser {
         let scrutinee = self.parse_expr()?;
 
         // Note: 'with' keyword is no longer required
-
-        // Optional leading |
-        self.eat(TokenKind::Bar);
-
-        let mut arms = Vec::new();
-        arms.push(self.parse_match_arm()?);
-
-        while self.eat(TokenKind::Bar) {
-            arms.push(self.parse_match_arm()?);
-        }
-
-        let end_span = arms.last().map(|a| a.body.span).unwrap_or(start);
-        let span = start.merge(end_span);
-
-        Ok(Spanned::new(
-            Expr::Match(Box::new(scrutinee), arms),
-            span,
-        ))
-    }
-
-    fn parse_case_expr(&mut self) -> Result<Spanned<Expr>, ParseError> {
-        let start = self.expect(TokenKind::Case)?.span;
-        let scrutinee = self.parse_expr()?;
-
-        self.expect(TokenKind::Of)?;
 
         // Optional leading |
         self.eat(TokenKind::Bar);
@@ -1901,16 +1873,6 @@ mod tests {
             assert_eq!(arms.len(), 2);
         } else {
             panic!("Expected Match");
-        }
-    }
-
-    #[test]
-    fn parse_case_expr() {
-        let expr = parse_expr("case x of Some y -> y | None -> 0").unwrap();
-        if let Expr::Match(_, arms) = expr {
-            assert_eq!(arms.len(), 2);
-        } else {
-            panic!("Expected Match (from case)");
         }
     }
 

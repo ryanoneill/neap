@@ -259,7 +259,6 @@ impl TokenKind {
             Self::Let
                 | Self::If
                 | Self::Match
-                | Self::Case
                 | Self::Do
                 | Self::LParen
                 | Self::LBracket

@@ -3,6 +3,8 @@
 //! This module transpiles Neap IR to zsh shell scripts.
 //! All values are represented as JSON for uniform handling.
 
+use std::collections::HashSet;
+
 use crate::ir::{IRCommandPart, IRDecl, IRExpr, IRLiteral, IRPattern, IRProgram, Primitive, VarId};
 
 use super::runtime::RUNTIME;
@@ -15,6 +17,8 @@ pub struct ZshCodegen {
     indent: usize,
     /// Counter for generating unique temporary variables
     temp_counter: usize,
+    /// Set of function names (to distinguish from value globals)
+    function_names: HashSet<String>,
 }
 
 impl Default for ZshCodegen {
@@ -31,12 +35,21 @@ impl ZshCodegen {
             output: String::new(),
             indent: 0,
             temp_counter: 0,
+            function_names: HashSet::new(),
         }
     }
 
     /// Generate zsh code from an IR program.
     #[must_use]
     pub fn generate(mut self, program: &IRProgram) -> String {
+        // First pass: collect function names
+        for decl in &program.decls {
+            if let IRDecl::Fun { name, .. } = decl {
+                self.function_names.insert(name.clone());
+            }
+        }
+
+        // Second pass: generate code
         self.emit_shebang();
         self.emit_runtime();
         self.emit_program(program);
@@ -162,7 +175,15 @@ impl ZshCodegen {
 
             IRExpr::Var(id, _) => format!("\"$_{}\"", id.raw()),
 
-            IRExpr::Global(name, _) => format!("\"${}\"", name),
+            IRExpr::Global(name, _) => {
+                if self.function_names.contains(name) {
+                    // Function reference - emit the runtime function name as a string
+                    format!("\"__{}\"", name)
+                } else {
+                    // Value reference - emit as shell variable
+                    format!("\"${}\"", name)
+                }
+            }
 
             IRExpr::Unit => "null".to_string(),
 
